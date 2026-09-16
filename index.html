@@ -1,0 +1,1349 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An interactive, step-by-step visual explanation of XGBoost regression.">
+  <title>XGBoost — Interactive Algorithm Visualizer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --ink: #070706;
+      --surface: #0e0e0c;
+      --surface-2: #151512;
+      --line: #2b2a24;
+      --line-soft: #1e1e1a;
+      --paper: #f3f0e7;
+      --muted: #98958a;
+      --amber: #ffb000;
+      --amber-soft: #ffd166;
+      --teal: #54d6c3;
+      --red: #ff6b55;
+      --display: "DIN Condensed", "Avenir Next Condensed", "Franklin Gothic Condensed", sans-serif;
+      --mono: "SFMono-Regular", "Cascadia Code", "Liberation Mono", monospace;
+      --radius: 2px;
+      --header-h: 178px;
+      --footer-h: 158px;
+    }
+
+    * { box-sizing: border-box; }
+    html { background: var(--ink); scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-width: 320px;
+      background:
+        linear-gradient(rgba(255,176,0,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,176,0,.025) 1px, transparent 1px),
+        var(--ink);
+      background-size: 48px 48px;
+      color: var(--paper);
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    button, input { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--amber);
+      outline-offset: 3px;
+    }
+
+    .site-header {
+      min-height: var(--header-h);
+      padding: 26px clamp(20px, 4vw, 64px) 22px;
+      display: grid;
+      grid-template-columns: minmax(300px, 1.35fr) minmax(300px, .85fr);
+      gap: 40px;
+      align-items: end;
+      border-bottom: 1px solid var(--line);
+      background: rgba(7,7,6,.94);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .site-header::after {
+      content: "XGB";
+      position: absolute;
+      right: 20px;
+      top: 14px;
+      font: 800 clamp(96px, 12vw, 150px)/1 var(--display);
+      letter-spacing: -.06em;
+      color: transparent;
+      -webkit-text-stroke: 1px rgba(255,176,0,.09);
+      pointer-events: none;
+    }
+
+    .eyebrow, .section-kicker {
+      color: var(--amber);
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+    h1 {
+      margin: 10px 0 8px;
+      font: 800 clamp(46px, 6vw, 80px)/.82 var(--display);
+      letter-spacing: -.035em;
+      text-transform: uppercase;
+    }
+
+    .header-copy { max-width: 760px; margin: 0; color: #b7b4aa; }
+    .header-copy strong { color: var(--paper); }
+    .scope-note { margin: 10px 0 0; color: var(--muted); font-size: 10px; }
+    .equation-strip {
+      position: relative;
+      z-index: 1;
+      border-left: 2px solid var(--amber);
+      padding-left: 18px;
+    }
+    .equation-strip .formula { font: italic 20px/1.4 Georgia, serif; margin: 4px 0 14px; }
+    .stats { display: flex; gap: 28px; flex-wrap: wrap; }
+    .stat-label { color: var(--muted); display: block; font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .stat-value { display: block; font: 700 17px/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+    .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); margin-right: 7px; box-shadow: 0 0 12px rgba(84,214,195,.5); }
+
+    .workspace {
+      height: calc(100vh - var(--header-h));
+      min-height: 560px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .workspace-column {
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--amber) var(--surface);
+    }
+    .workspace-column::-webkit-scrollbar { width: 7px; }
+    .workspace-column::-webkit-scrollbar-track { background: var(--surface); }
+    .workspace-column::-webkit-scrollbar-thumb { background: var(--amber); }
+    .left-column { border-right: 1px solid var(--line); }
+    .panel { padding: 30px clamp(20px, 3vw, 44px) 36px; border-bottom: 1px solid var(--line); }
+    .panel:last-child { border-bottom: 0; }
+    .section-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+    h2 { margin-bottom: 0; font: 700 clamp(25px, 2.4vw, 34px)/1 var(--display); text-transform: uppercase; letter-spacing: .01em; }
+    .section-index { color: #444239; font: 700 28px/1 var(--display); }
+    .section-note { color: var(--muted); max-width: 48ch; margin: 8px 0 0; font-size: 11px; }
+
+    .plot-shell { position: relative; background: #0a0a08; border: 1px solid var(--line); overflow: hidden; }
+    .tree-shell { overflow-x: auto; }
+    .plot-shell::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(135deg, rgba(255,255,255,.018), transparent 35%); }
+    svg { display: block; width: 100%; height: auto; }
+    #dataPlot { min-height: 360px; cursor: crosshair; touch-action: none; }
+    #treePlot { min-height: 250px; }
+    #lossPlot { min-height: 220px; }
+
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+    .button {
+      min-height: 40px;
+      padding: 9px 14px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: transparent;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: color .18s ease, border-color .18s ease, background .18s ease, transform .18s ease;
+    }
+    .button:hover:not(:disabled) { border-color: var(--amber); color: var(--amber); transform: translateY(-1px); }
+    .button.primary { background: var(--amber); border-color: var(--amber); color: #111; }
+    .button.primary:hover:not(:disabled) { background: var(--amber-soft); color: #111; }
+    .button.mode-active { border-color: var(--teal); color: var(--teal); background: rgba(84,214,195,.07); }
+    .button.danger:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+    .button:disabled { opacity: .3; cursor: not-allowed; }
+
+    .hint-bar { margin-top: 12px; color: var(--muted); font-size: 10px; display: flex; align-items: center; gap: 8px; }
+    .hint-bar::before { content: ""; width: 22px; height: 1px; background: var(--amber); }
+    .residual-guide { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 1px; margin-top: 12px; border: 1px solid var(--line); background: var(--line); }
+    .residual-guide > div { padding: 10px 12px; background: #0b0b09; color: var(--muted); font-size: 9px; }
+    .residual-guide strong { display: block; color: var(--paper); font-size: 10px; margin-bottom: 2px; }
+    .residual-guide .up strong { color: var(--teal); }
+    .residual-guide .down strong { color: var(--red); }
+
+    .control-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 28px; }
+    .control { padding: 15px 0; border-top: 1px solid var(--line-soft); }
+    .control:nth-child(-n+2) { border-top-color: var(--line); }
+    .control-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+    .control label { font-weight: 700; color: #d8d5cc; }
+    .control output { color: var(--amber); font-variant-numeric: tabular-nums; }
+    .control small { display: block; color: #77756d; margin-top: 7px; font-size: 9px; line-height: 1.45; }
+    input[type="range"] { width: 100%; accent-color: var(--amber); cursor: pointer; }
+    .execution { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+    .execution .button { min-width: 120px; }
+    .live-message { min-height: 22px; margin: 12px 0 0; color: var(--teal); font-size: 11px; }
+
+    .flow-label { margin: 0 0 9px; color: var(--muted); font-size: 9px; letter-spacing: .12em; text-transform: uppercase; }
+    .flow-chain { margin: -2px 0 10px; overflow-x: auto; color: var(--amber); font-size: 8px; letter-spacing: .04em; white-space: nowrap; }
+    .phase-timeline { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 18px; border: 1px solid var(--line); }
+    .phase-step { min-width: 0; min-height: 82px; padding: 11px 8px 10px; color: #66645d; background: #090907; border-left: 1px solid var(--line); font-size: 8px; line-height: 1.35; text-align: center; text-transform: uppercase; transition: background .18s ease, color .18s ease; }
+    .phase-step::before { content: attr(data-step); display: grid; place-items: center; width: 20px; height: 20px; margin: 0 auto 6px; border: 1px solid currentColor; border-radius: 50%; font-size: 9px; }
+    .phase-step:first-child { border-left: 0; }
+    .phase-step:nth-child(5) { border-left: 0; }
+    .phase-step:nth-child(n+5) { border-top: 1px solid var(--line); }
+    .phase-step.complete { color: #aaa79d; }
+    .phase-step.complete::before { content: "✓"; color: var(--teal); }
+    .phase-step.active { color: #10100d; background: var(--amber); font-weight: 800; }
+
+    .calculation {
+      padding: 20px;
+      background: var(--surface-2);
+      border-left: 2px solid var(--amber);
+    }
+    .calculation h3 { font: 700 20px/1 var(--display); text-transform: uppercase; margin-bottom: 10px; }
+    .calculation p { color: #b8b5ac; margin-bottom: 10px; }
+    .calculation p:last-child { margin-bottom: 0; }
+    .math-line { overflow-x: auto; padding: 10px 0; color: var(--paper) !important; font: italic 16px/1.5 Georgia, serif; white-space: nowrap; }
+    .concept-tag { display: inline-block; margin-bottom: 8px; color: var(--amber); font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+
+    .candidate-panel { margin-top: 14px; border: 1px solid var(--line); background: #0a0a08; }
+    .candidate-head { display: flex; justify-content: space-between; gap: 20px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+    .candidate-head strong { font-size: 10px; text-transform: uppercase; }
+    .candidate-head span { color: var(--muted); font-size: 9px; }
+    .candidate-list { max-height: 252px; overflow-y: auto; padding: 5px 14px 10px; scrollbar-width: thin; scrollbar-color: var(--amber) var(--surface); }
+    .candidate-row { display: grid; grid-template-columns: minmax(190px, 1.25fr) minmax(80px, 1fr) 64px; gap: 10px; align-items: center; padding: 7px 0; color: var(--muted); font-size: 9px; }
+    .candidate-row small { display: block; margin-top: 2px; color: #737169; font-size: 7px; font-weight: 400; line-height: 1.35; }
+    .candidate-row.best small { color: #c88c10; }
+    .candidate-bar { height: 4px; background: var(--line); }
+    .candidate-bar i { display: block; height: 100%; background: #615f57; }
+    .candidate-row.best { color: var(--amber); font-weight: 700; }
+    .candidate-row.best .candidate-bar i { background: var(--amber); box-shadow: 0 0 10px rgba(255,176,0,.25); }
+    .candidate-empty { padding: 14px; color: var(--muted); font-size: 9px; }
+
+    .quick-reference { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; margin-top: 18px; background: var(--line); }
+    .quick-reference > div { padding: 10px 12px; background: #0c0c0a; color: var(--muted); font-size: 9px; }
+    .quick-reference strong { color: var(--paper); }
+    .step-answers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 14px 0; background: var(--line); }
+    .step-answers > div { padding: 10px 12px; background: #0c0c0a; color: #aaa79d; font-size: 9px; }
+    .step-answers strong { display: block; margin-bottom: 4px; color: var(--amber); font-size: 8px; letter-spacing: .1em; text-transform: uppercase; }
+
+    .ensemble-list { margin-top: 16px; border-top: 1px solid var(--line); }
+    .ensemble-equation { margin-top: 14px; padding: 15px 18px; border: 1px solid rgba(255,176,0,.5); background: rgba(255,176,0,.06); }
+    .ensemble-equation .formula { color: var(--paper); font: italic 18px/1.4 Georgia, serif; }
+    .ensemble-equation p { margin: 4px 0 0; color: var(--muted); font-size: 9px; }
+    .ensemble-equation .pending-term { color: var(--amber); border-bottom: 1px dashed var(--amber); }
+    .ensemble-item { display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+    .ensemble-item::before { content: "+"; position: absolute; margin-left: -22px; color: var(--teal); }
+    .ensemble-item { position: relative; }
+    .tree-number { color: var(--amber); font-weight: 700; }
+    .tree-rule { color: #bab7ae; font-size: 11px; }
+    .tree-gain { color: var(--muted); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .empty-state { color: var(--muted); padding: 18px 0; }
+    .tree-state { margin: 10px 0 0; color: var(--muted); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+    .tree-state strong { color: var(--amber); }
+    .why-boosting { margin-top: 26px; padding: 18px; border: 1px solid var(--line); background: linear-gradient(105deg, rgba(84,214,195,.05), transparent 65%); }
+    .why-track { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-bottom: 12px; overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--amber) #181814; }
+    .why-track::-webkit-scrollbar { height: 6px; }
+    .why-track::-webkit-scrollbar-track { background: #181814; }
+    .why-track::-webkit-scrollbar-thumb { background: var(--amber); border-radius: 999px; }
+    .why-node { flex: 0 0 auto; padding: 8px 10px; border: 1px solid var(--line); color: #bbb8ae; font-size: 8px; text-transform: uppercase; }
+    .why-node:last-child { margin-right: 8px; }
+    .why-arrow { color: var(--amber); flex: 0 0 auto; }
+
+    .table-wrap { overflow-x: auto; border-top: 1px solid var(--line); }
+    table { width: 100%; border-collapse: collapse; min-width: 670px; font-variant-numeric: tabular-nums; }
+    th, td { padding: 10px 9px; text-align: right; border-bottom: 1px solid var(--line-soft); }
+    th { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; position: sticky; top: 0; background: var(--surface); }
+    th:first-child, td:first-child { text-align: left; }
+    tbody tr:hover { background: rgba(255,176,0,.04); }
+    .table-color-key { display: flex; flex-wrap: wrap; gap: 8px 18px; padding: 11px 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 8px; letter-spacing: .06em; text-transform: uppercase; }
+    .table-color-key span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: currentColor; }
+    th.value-target, td.value-target { color: var(--paper); }
+    th.value-previous, td.value-previous { color: #88a8c7; }
+    th.value-residual, th.value-gradient { color: #d69b8e; }
+    td.correction-up { color: var(--teal); background: rgba(84,214,195,.045); }
+    td.correction-down { color: var(--red); background: rgba(255,107,85,.045); }
+    td.correction-zero { color: var(--muted); }
+    th.value-hessian, td.value-hessian { color: #7ecbd2; }
+    th.value-leaf, td.value-leaf { color: var(--amber-soft); }
+    th.value-contribution, td.value-contribution { color: var(--amber); background: rgba(255,176,0,.055); font-weight: 700; }
+    th.value-updated, td.value-updated { color: var(--teal); background: rgba(84,214,195,.075); font-weight: 800; }
+    .key-previous { color: #88a8c7; } .key-up { color: var(--teal); } .key-down { color: var(--red); } .key-contribution { color: var(--amber); } .key-updated { color: #7ce6d5; }
+    .negative { color: var(--red); }
+    .positive { color: var(--teal); }
+    .stop-reason { display: none; margin-top: 12px; padding: 10px 12px; border-left: 2px solid var(--amber); background: rgba(255,176,0,.07); color: var(--paper); font-size: 9px; }
+    .stop-reason.visible { display: block; }
+
+    .site-footer {
+      min-height: var(--footer-h);
+      padding: 30px clamp(20px, 4vw, 64px);
+      border-top: 1px solid var(--line);
+      background: #050504;
+      display: grid;
+      grid-template-columns: minmax(230px, .75fr) minmax(500px, 2fr);
+      gap: 50px;
+      align-items: center;
+    }
+    .brand-lockup { display: flex; align-items: center; gap: 18px; }
+    .ce-mark { width: 74px; height: 74px; flex: 0 0 auto; }
+    .group-name { margin: 3px 0 2px; font: 700 24px/1.2 var(--display); }
+    .school-name { color: var(--muted); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
+    .roster { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px 24px; }
+    .member { padding-top: 7px; border-top: 1px solid var(--line-soft); color: #b8b5ac; white-space: nowrap; }
+    .member span { color: var(--amber); margin-right: 8px; font-size: 10px; }
+    .group-name[lang="th"], .member[lang="th"] { font-family: Tahoma, "Noto Sans Thai", sans-serif; }
+    .group-name[lang="th"] { line-height: 1.35; }
+
+    .reveal { animation: rise .6s cubic-bezier(.2,.8,.2,1) both; }
+    .reveal:nth-child(2) { animation-delay: .08s; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes dash { from { stroke-dashoffset: 800; } to { stroke-dashoffset: 0; } }
+    .loss-line { stroke-dasharray: 800; animation: dash .65s ease-out both; }
+    .loss-hit { cursor: crosshair; }
+    .loss-hit:focus { outline: none; stroke: none; }
+    .loss-tooltip { pointer-events: none; transition: opacity .14s ease; }
+
+    @media (max-width: 1050px) {
+      .site-header { grid-template-columns: 1fr; gap: 18px; }
+      :root { --header-h: 250px; }
+      .control-grid { grid-template-columns: 1fr; }
+      .roster { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 899px) {
+      :root { --header-h: auto; }
+      .site-header { min-height: 0; padding-top: 24px; }
+      .site-header::after { right: 16px; top: 16px; font-size: 104px; }
+      .workspace { height: auto; min-height: 0; display: block; }
+      .workspace-column { overflow: visible; }
+      .left-column { border-right: 0; }
+      .site-footer { grid-template-columns: 1fr; gap: 26px; }
+      .roster { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    }
+    @media (max-width: 560px) {
+      .site-header, .panel, .site-footer { padding-left: 16px; padding-right: 16px; }
+      h1 { font-size: 46px; }
+      .stats { gap: 16px; }
+      .phase-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .phase-step:nth-child(odd) { border-left: 0; }
+      .phase-step:nth-child(n+3) { border-top: 1px solid var(--line); }
+      .residual-guide, .quick-reference, .step-answers { grid-template-columns: 1fr; }
+      .roster { grid-template-columns: 1fr; }
+      .member { white-space: normal; }
+      #dataPlot { min-height: 290px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="reveal">
+      <div class="eyebrow">Interactive algorithm visualizer</div>
+      <h1>XGBoost</h1>
+      <p class="header-copy"><strong>Extreme Gradient Boosting</strong> builds a strong predictor by adding small decision trees. Each new tree studies the mistakes made so far, then nudges the prediction in a better direction.</p>
+      <p class="scope-note">Simplified educational implementation · one-dimensional regression · squared-error objective</p>
+    </div>
+    <div class="equation-strip reveal" aria-label="Current model summary">
+      <div class="eyebrow">The additive idea</div>
+      <div class="formula">ŷ<sup>(t)</sup> = ŷ<sup>(t−1)</sup> + η f<sub>t</sub>(x)</div>
+      <div class="stats">
+        <div><span class="stat-label">Boosting round</span><span class="stat-value" id="roundValue">0 / 8</span></div>
+        <div><span class="stat-label">Mean squared error</span><span class="stat-value" id="lossValue">—</span></div>
+        <div><span class="stat-label">Model status</span><span class="stat-value"><i class="status-dot"></i><span id="statusValue">Ready</span></span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="workspace-column left-column" aria-label="Data and controls">
+      <article class="panel reveal">
+        <div class="section-head">
+          <div><div class="section-kicker">Data laboratory</div><h2>Shape the problem</h2><p class="section-note">Each dot is one training example. Its horizontal position is the input x; height is the target y.</p></div>
+          <span class="section-index">01</span>
+        </div>
+        <div class="plot-shell">
+          <svg id="dataPlot" viewBox="0 0 720 430" role="img" aria-labelledby="dataPlotTitle dataPlotDesc" tabindex="0">
+            <title id="dataPlotTitle">XGBoost regression data canvas</title>
+            <desc id="dataPlotDesc">Training points, residuals, learned prediction line, and newest split.</desc>
+          </svg>
+        </div>
+        <div class="residual-guide" id="residualGuide" aria-label="How to read residuals">
+          <div><strong>Residual = Actual − Prediction</strong>The dashed line is the error still left to correct.</div>
+          <div class="up"><strong>Positive residual</strong>The actual value is higher, so the model should correct upward.</div>
+          <div class="down"><strong>Negative residual</strong>The actual value is lower, so the model should correct downward.</div>
+        </div>
+        <div class="toolbar" aria-label="Dataset tools">
+          <button class="button mode-active" id="addMode" type="button">＋ Add points</button>
+          <button class="button" id="deleteMode" type="button">− Delete points</button>
+          <button class="button" id="randomize" type="button">Random data</button>
+          <button class="button danger" id="clearData" type="button">Clear</button>
+        </div>
+        <div class="hint-bar" id="canvasHint">Click anywhere inside the plot to add a point.</div>
+      </article>
+
+      <article class="panel reveal">
+        <div class="section-head">
+          <div><div class="section-kicker">Experiment controls</div><h2>Tune the learner</h2></div>
+          <span class="section-index">02</span>
+        </div>
+        <div class="control-grid">
+          <div class="control"><div class="control-top"><label for="maxTrees">Number of trees</label><output id="maxTreesOut">8</output></div><input id="maxTrees" type="range" min="1" max="20" value="8"><small>Maximum boosting rounds in the ensemble.</small></div>
+          <div class="control"><div class="control-top"><label for="learningRate">Learning rate η</label><output id="learningRateOut">0.30</output></div><input id="learningRate" type="range" min="0.05" max="1" step="0.05" value="0.30"><small>How much of each correction is applied. Smaller is steadier.</small></div>
+          <div class="control"><div class="control-top"><label for="maxDepth">Maximum depth</label><output id="maxDepthOut">2</output></div><input id="maxDepth" type="range" min="1" max="3" value="2"><small>How many split levels one tree may grow.</small></div>
+          <div class="control"><div class="control-top"><label for="lambda">L2 penalty λ</label><output id="lambdaOut">1.0</output></div><input id="lambda" type="range" min="0" max="10" step="0.5" value="1"><small>Shrinks leaf weights to resist overfitting.</small></div>
+          <div class="control"><div class="control-top"><label for="gamma">Minimum gain γ</label><output id="gammaOut">0.0</output></div><input id="gamma" type="range" min="0" max="5" step="0.25" value="0"><small>A split must earn more than this complexity cost.</small></div>
+          <div class="control"><div class="control-top"><label for="tolerance">Convergence tolerance</label><output id="toleranceOut">0.0001</output></div><input id="tolerance" type="range" min="0.00001" max="0.01" step="0.00001" value="0.0001"><small>Stop when the MSE improvement falls below this value.</small></div>
+          <div class="control"><div class="control-top"><label for="speed">Step speed</label><output id="speedOut">700 ms</output></div><input id="speed" type="range" min="200" max="1600" step="100" value="700"><small>Delay between teaching steps during automatic training.</small></div>
+        </div>
+        <div class="execution">
+          <div class="section-kicker">Execution</div>
+          <div class="toolbar">
+            <button class="button primary" id="stepButton" type="button">Next: initial prediction</button>
+            <button class="button" id="playButton" type="button">▶ Train until convergence</button>
+            <button class="button" id="pauseButton" type="button" disabled>Ⅱ Pause</button>
+            <button class="button" id="resetButton" type="button">↺ Reset model</button>
+          </div>
+          <p class="live-message" id="liveMessage" role="status" aria-live="polite">Model initialized at the mean target value.</p>
+          <div class="stop-reason" id="stopReason" role="status"></div>
+        </div>
+      </article>
+    </section>
+
+    <section class="workspace-column right-column" aria-label="Model state and loss">
+      <article class="panel reveal">
+        <div class="section-head">
+          <div><div class="section-kicker">Inside the model</div><h2>Follow the correction</h2><p class="section-note">One boosting round follows these eight steps, then passes its updated prediction into the next round.</p></div>
+          <span class="section-index">03</span>
+        </div>
+        <p class="flow-label">Learning Flow</p>
+        <p class="flow-chain" id="learningFlow">Dataset → Prediction → Gradient/Hessian → Split Gain → Leaf Weight → Contribution → Update → Loss → Repeat</p>
+        <p class="flow-label">Follow the correction · 8 steps</p>
+        <div class="phase-timeline" id="phaseTimeline" aria-label="Current step in one boosting round">
+          <div class="phase-step active" data-phase="dataset" data-step="1">Input Dataset</div>
+          <div class="phase-step" data-phase="initial" data-step="2">Initial Prediction</div>
+          <div class="phase-step" data-phase="derivatives" data-step="3">Calculate Gradients &amp; Hessians</div>
+          <div class="phase-step" data-phase="tree" data-step="4">Find the Best Split</div>
+          <div class="phase-step" data-phase="leaf" data-step="5">Calculate Leaf Weights</div>
+          <div class="phase-step" data-phase="contribution" data-step="6">Calculate Tree Contribution</div>
+          <div class="phase-step" data-phase="update" data-step="7">Update Prediction &amp; Loss</div>
+          <div class="phase-step" data-phase="repeat" data-step="8">Add Tree &amp; Repeat</div>
+        </div>
+        <div class="calculation" id="calculation"></div>
+        <div class="candidate-panel" id="candidateSplits"></div>
+        <div id="decisionTreeSection">
+          <div class="section-head" style="margin-top:30px">
+            <div><div class="section-kicker">Newest weak learner</div><h2>Decision tree</h2><p class="section-note">The selected split rules route each sample to one corrective leaf.</p></div>
+          </div>
+          <div class="plot-shell tree-shell" id="treeShell"><svg id="treePlot" viewBox="0 0 720 310" role="img" aria-labelledby="treeTitle treeDesc"><title id="treeTitle">Current XGBoost decision tree</title><desc id="treeDesc">The newest tree, its split thresholds, gains, and leaf weights.</desc></svg></div>
+          <p class="tree-state" id="treeState">No corrective tree is being built yet.</p>
+        </div>
+        <div class="ensemble-equation" id="ensemblePanel">
+          <div class="section-kicker">Additive ensemble</div>
+          <div class="formula" id="ensembleEquation">ŷ = f₀</div>
+          <p id="ensembleCaption">The base prediction plus many small corrective trees becomes one strong model.</p>
+          <p>General form: ŷ = f₀ + ηf₁ + ηf₂ + ... + ηfₜ</p>
+        </div>
+        <div id="ensembleList" class="ensemble-list"></div>
+        <div class="section-head" style="margin-top:30px">
+          <div><div class="section-kicker">Training ledger</div><h2>Point-by-point state</h2></div>
+        </div>
+        <div class="table-color-key" id="tableColorKey" aria-label="Table color guide"></div>
+        <div class="table-wrap"><table><thead><tr id="pointTableHead"></tr></thead><tbody id="pointTableBody"></tbody></table></div>
+        <div class="why-boosting" id="whyBoosting">
+          <div class="section-kicker">Why boosting?</div>
+          <div class="why-track" aria-label="Why boosting works"><span class="why-node">One tree</span><span class="why-arrow">→</span><span class="why-node">Find current mistakes</span><span class="why-arrow">→</span><span class="why-node">Build a corrective tree</span><span class="why-arrow">→</span><span class="why-node">Add a small correction</span><span class="why-arrow">→</span><span class="why-node">Repeat</span><span class="why-arrow">→</span><span class="why-node">Stronger model</span></div>
+        </div>
+      </article>
+
+      <article class="panel reveal">
+        <div class="section-head">
+          <div><div class="section-kicker">Primary training objective</div><h2>Loss by boosting round</h2><p class="section-note">The bold amber MSE curve drives training. RMSE and MAE remain as quieter secondary reference metrics.</p></div>
+          <span class="section-index">04</span>
+        </div>
+        <div class="plot-shell"><svg id="lossPlot" viewBox="0 0 720 300" role="img" aria-labelledby="lossTitle lossDesc"><title id="lossTitle">Mean squared error by boosting round</title><desc id="lossDesc">A line chart showing model loss after every added tree.</desc></svg></div>
+        <div class="quick-reference" id="quickReference" aria-label="Quick Reference">
+          <div><strong>Gradient</strong> → correction direction</div><div><strong>Hessian</strong> → loss curvature</div><div><strong>Leaf Weight</strong> → correction size</div><div><strong>Learning Rate</strong> → correction scale</div>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="brand-lockup">
+      <svg class="ce-mark" viewBox="0 0 80 80" role="img" aria-label="CE KMITL mark">
+        <path d="M8 8h64v64H8z" fill="none" stroke="#ffb000" stroke-width="2"/>
+        <path d="M36 23H23c-6 0-9 3-9 9v16c0 6 3 9 9 9h13" fill="none" stroke="#f3f0e7" stroke-width="5"/>
+        <path d="M45 23h21M45 23v34M45 40h17M45 57h21" fill="none" stroke="#ffb000" stroke-width="5"/>
+      </svg>
+      <div><div class="section-kicker">Group 2</div><div class="group-name" lang="th">ทำมาดีโรตีธรรมดา</div><div class="school-name">Computer Engineering · KMITL</div></div>
+    </div>
+    <div class="roster" aria-label="Group members">
+      <div class="member" lang="th"><span>66010016</span>กรวิชญ์ สวัสดี</div>
+      <div class="member" lang="th"><span>66010405</span>นฤณ วงรุจิระ</div>
+      <div class="member" lang="th"><span>66010660</span>มนัสวิน ขุนนันทเจียม</div>
+      <div class="member" lang="th"><span>66010853</span>สิริมา หมุกแก้ว</div>
+      <div class="member" lang="th"><span>66010898</span>อนันธชัย จานเจือ</div>
+    </div>
+  </footer>
+
+  <script>
+    'use strict';
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const PALETTE = { amber: '#ffb000', amberSoft: '#ffd166', paper: '#f3f0e7', muted: '#858278', line: '#2b2a24', teal: '#54d6c3', red: '#ff6b55', surface: '#10100d' };
+    const seededPoints = [
+      {x:.8,y:1.4},{x:1.6,y:2.2},{x:2.4,y:1.8},{x:3.2,y:3.4},{x:4.1,y:4.2},
+      {x:5.0,y:4.8},{x:5.8,y:6.7},{x:6.7,y:6.2},{x:7.6,y:8.1},{x:8.5,y:7.6},{x:9.2,y:9.1}
+    ];
+
+    const $ = selector => document.querySelector(selector);
+    const fmt = (value, digits = 3) => Number.isFinite(value) ? Number(value).toFixed(digits) : '—';
+    const sum = values => values.reduce((total, value) => total + value, 0);
+    const mean = values => values.length ? sum(values) / values.length : 0;
+    const mse = (points, predictions) => points.length ? mean(points.map((point, i) => (point.y - predictions[i]) ** 2)) : 0;
+    const PHASES = ['dataset','initial','derivatives','tree','leaf','contribution','update','repeat'];
+    const stepAnswers = (what, why, changes) => `<div class="step-answers"><div><strong>What happens?</strong>${what}</div><div><strong>Why?</strong>${why}</div><div><strong>What changes?</strong>${changes}</div></div>`;
+
+    function collectLeaves(tree) {
+      const leaves = [];
+      (function visit(node) { if (node.type === 'leaf') leaves.push(node); else { visit(node.left); visit(node.right); } })(tree);
+      return leaves;
+    }
+
+    function leafForX(tree, x) {
+      let node = tree;
+      while (node.type !== 'leaf') node = x < node.threshold ? node.left : node.right;
+      return node;
+    }
+
+    function treePath(tree, x) {
+      const rules = [];
+      let node = tree;
+      while (node.type !== 'leaf') {
+        const goesLeft = x < node.threshold;
+        rules.push(`x ${goesLeft ? '&lt;' : '≥'} ${fmt(node.threshold,2)}`);
+        node = goesLeft ? node.left : node.right;
+      }
+      return rules.join(' → ') || 'Single leaf';
+    }
+
+    function errorMetrics(points, predictions) {
+      if (!points.length) return {mse:0, rmse:0, mae:0};
+      const errors = points.map((point, i) => point.y - predictions[i]);
+      const mseValue = mean(errors.map(error => error ** 2));
+      return {mse:mseValue, rmse:Math.sqrt(mseValue), mae:mean(errors.map(Math.abs))};
+    }
+
+    function computeDerivatives(points, predictions) {
+      return {
+        gradients: points.map((point, i) => predictions[i] - point.y),
+        hessians: points.map(() => 1)
+      };
+    }
+
+    function totals(indices, gradients, hessians) {
+      return {
+        G: sum(indices.map(i => gradients[i])),
+        H: sum(indices.map(i => hessians[i]))
+      };
+    }
+
+    function leafWeight(indices, gradients, hessians, lambda) {
+      const {G, H} = totals(indices, gradients, hessians);
+      return -G / (H + lambda);
+    }
+
+    function splitGain(left, right, gradients, hessians, lambda, gamma) {
+      const l = totals(left, gradients, hessians);
+      const r = totals(right, gradients, hessians);
+      const G = l.G + r.G;
+      const H = l.H + r.H;
+      return .5 * ((l.G ** 2) / (l.H + lambda) + (r.G ** 2) / (r.H + lambda) - (G ** 2) / (H + lambda)) - gamma;
+    }
+
+    function buildTree(points, gradients, hessians, params) {
+      const allIndices = points.map((_, i) => i);
+      function build(indices, depth) {
+        const fallback = {type:'leaf', weight:leafWeight(indices, gradients, hessians, params.lambda), indices:[...indices]};
+        if (depth >= params.maxDepth || indices.length < 4) return fallback;
+        const sorted = [...indices].sort((a, b) => points[a].x - points[b].x);
+        let best = null;
+        const candidates = [];
+        for (let cut = 2; cut <= sorted.length - 2; cut++) {
+          if (points[sorted[cut - 1]].x === points[sorted[cut]].x) continue;
+          const left = sorted.slice(0, cut);
+          const right = sorted.slice(cut);
+          const threshold = (points[sorted[cut - 1]].x + points[sorted[cut]].x) / 2;
+          const gain = splitGain(left, right, gradients, hessians, params.lambda, params.gamma);
+          const candidate = {left, right, threshold, gain};
+          candidates.push(candidate);
+          if (!best || gain > best.gain) best = candidate;
+        }
+        const visibleCandidates = candidates.map(candidate => ({threshold:candidate.threshold, gain:candidate.gain, left:[...candidate.left], right:[...candidate.right], best:candidate === best && best.gain > 1e-12}));
+        if (!best || best.gain <= 1e-12) return {...fallback, candidates:visibleCandidates};
+        return {
+          type:'split', threshold:best.threshold, gain:best.gain, indices:[...indices],
+          candidates:visibleCandidates,
+          left:build(best.left, depth + 1), right:build(best.right, depth + 1)
+        };
+      }
+      return build(allIndices, 0);
+    }
+
+    function predictTree(node, x) {
+      if (node.type === 'leaf') return node.weight;
+      return predictTree(x < node.threshold ? node.left : node.right, x);
+    }
+
+    function applyBoostRound(points, predictions, params) {
+      const previous = [...predictions];
+      const {gradients, hessians} = computeDerivatives(points, previous);
+      const tree = buildTree(points, gradients, hessians, params);
+      const treeOutputs = points.map(point => predictTree(tree, point.x));
+      const updated = previous.map((prediction, i) => prediction + params.learningRate * treeOutputs[i]);
+      return {tree, previous, gradients, hessians, treeOutputs, updated, loss:mse(points, updated)};
+    }
+
+    function assertClose(actual, expected, label, epsilon = 1e-8) {
+      if (Math.abs(actual - expected) > epsilon) {
+        throw new Error(`${label}: expected ${expected}, received ${actual}`);
+      }
+    }
+
+    function runAlgorithmSelfTests() {
+      if (state.phase !== 'dataset') throw new Error('training phase: a reset model must begin at the input dataset');
+      if (document.querySelector('#mathFlow')) throw new Error('learning flow: the Follow the Correction sequence must not compete with a second numbered flow');
+      if (document.querySelectorAll('#phaseTimeline .phase-step').length !== 8) throw new Error('training timeline: expected eight interactive phases');
+      if ([...document.querySelectorAll('#phaseTimeline .phase-step')].map(step => step.dataset.phase).join(',') !== PHASES.join(',')) throw new Error('training timeline: phases are not in the required order');
+      const requiredLabels = ['Input Dataset','Initial Prediction','Calculate Gradients & Hessians','Find the Best Split','Calculate Leaf Weights','Calculate Tree Contribution','Update Prediction & Loss','Add Tree & Repeat'];
+      if ([...document.querySelectorAll('#phaseTimeline .phase-step')].map(step => step.textContent.trim()).join('|') !== requiredLabels.join('|')) throw new Error('training timeline: labels must match the requested eight steps');
+      if (document.querySelector('#boostLoop')) throw new Error('learning hierarchy: duplicate corrective-cycle section must be removed');
+      if (document.querySelector('#learningFlow')?.textContent.trim() !== 'Dataset → Prediction → Gradient/Hessian → Split Gain → Leaf Weight → Contribution → Update → Loss → Repeat') throw new Error('learning hierarchy: expected one compact learning flow');
+      if (!document.querySelector('#whyBoosting')) throw new Error('boosting rationale: expected a Why Boosting explanation');
+      const whyTrackStyle = getComputedStyle(document.querySelector('.why-track'));
+      if (parseFloat(whyTrackStyle.paddingBottom) < 10) throw new Error('why boosting: horizontal scrollbar needs reserved space below the text boxes');
+      if (!document.querySelector('#quickReference')) throw new Error('learning hierarchy: glossary must become Quick Reference');
+      const expectedThaiFooter = ['ทำมาดีโรตีธรรมดา','กรวิชญ์ สวัสดี','นฤณ วงรุจิระ','มนัสวิน ขุนนันทเจียม','สิริมา หมุกแก้ว','อนันธชัย จานเจือ'];
+      const footerText = document.querySelector('.site-footer')?.innerText || '';
+      if (!expectedThaiFooter.every(value=>footerText.includes(value))) throw new Error('footer localization: expected exact Thai group and member names');
+      const pageWithoutFooter = document.body.cloneNode(true);
+      pageWithoutFooter.querySelector('.site-footer')?.remove();
+      pageWithoutFooter.querySelectorAll('script,style').forEach(node=>node.remove());
+      if (/[ก-๙]/.test(pageWithoutFooter.textContent)) throw new Error('English UI: Thai text must remain scoped to the footer');
+      if (getComputedStyle(document.querySelector('.section-head')).alignItems !== 'flex-start') throw new Error('section hierarchy: section numbers must use top alignment');
+      assertClose(mean([1, 2, 6]), 3, 'mean');
+      assertClose(mse([{y: 1}, {y: 3}], [2, 2]), 1, 'mse');
+      const metrics = errorMetrics([{y: 2}, {y: 6}], [1, 3]);
+      assertClose(metrics.mse, 5, 'metric MSE');
+      assertClose(metrics.rmse, Math.sqrt(5), 'metric RMSE');
+      assertClose(metrics.mae, 2, 'metric MAE');
+      const derivatives = computeDerivatives([{y: 1}, {y: 3}], [2, 2]);
+      assertClose(derivatives.gradients[0], 1, 'gradient');
+      assertClose(derivatives.hessians[1], 1, 'hessian');
+      assertClose(leafWeight([0, 1], [-2, -2], [1, 1], 2), 1, 'leaf weight');
+      const gain = splitGain([0, 1], [2, 3], [-2, -1, 1, 2], [1, 1, 1, 1], 1, 0);
+      if (!(gain > 0)) throw new Error('split gain: expected a positive gain');
+      const fixture = [{x:1,y:1},{x:2,y:1.5},{x:8,y:8.5},{x:9,y:9}];
+      const preds = [5,5,5,5];
+      const d = computeDerivatives(fixture, preds);
+      const tree = buildTree(fixture, d.gradients, d.hessians, {maxDepth:1, lambda:1, gamma:0});
+      if (tree.type !== 'split') throw new Error('tree depth: expected a split root');
+      if (!Array.isArray(tree.candidates) || tree.candidates.length !== 1) throw new Error('split candidates: expected every valid root threshold');
+      assertClose(tree.candidates[0].threshold, 5, 'split candidate threshold');
+      if (!tree.candidates[0].best) throw new Error('split candidates: winning threshold must be marked best');
+      const blockedTree = buildTree(fixture, d.gradients, d.hessians, {maxDepth:1, lambda:1, gamma:100});
+      if (blockedTree.type !== 'leaf' || blockedTree.candidates?.length !== 1) throw new Error('split candidates: rejected gains must remain visible');
+      if (tree.left.type !== 'leaf' || tree.right.type !== 'leaf') throw new Error('tree depth: children must be leaves');
+      if (!(predictTree(tree, 1) < 0 && predictTree(tree, 9) > 0)) throw new Error('tree prediction: wrong correction direction');
+      const beforeLoss = mse(fixture, preds);
+      const round = applyBoostRound(fixture, preds, {maxDepth:1, lambda:1, gamma:0, learningRate:.3});
+      if (round.updated.length !== fixture.length) throw new Error('boost round: point count changed');
+      if (!round.updated.some((value, i) => value !== preds[i])) throw new Error('boost round: predictions did not change');
+      if (round.loss > beforeLoss + 1e-10) throw new Error('boost round: loss increased');
+
+      if (typeof advanceTrainingStep !== 'function') throw new Error('training phases: step action must advance one teaching phase');
+      if (typeof renderLearningState !== 'function') throw new Error('learning state: current phase must drive the educational UI');
+      const tableHeadings = () => [...document.querySelectorAll('#pointTableHead th')].map(node=>node.textContent.trim()).join('|');
+      const savedState = {...state};
+      try {
+        Object.assign(state, {
+          points:fixture, predictions:[...preds], basePrediction:5, trees:[],
+          lossHistory:[beforeLoss], metricHistory:[errorMetrics(fixture, preds)],
+          params:{maxTrees:1, learningRate:.3, maxDepth:1, lambda:1, gamma:0, convergenceTolerance:.0001, animationSpeed:700},
+          phase:'dataset', pendingRound:null, snapshot:null, playing:false, timer:null, stopReason:''
+        });
+        advanceTrainingStep(false);
+        if (state.phase !== 'initial' || state.pendingRound !== null) throw new Error('training phases: initial prediction must not precompute the next tree');
+        renderPointTable();
+        if (tableHeadings() !== 'Point|x|Target y|Prediction') throw new Error('point table: initial prediction columns must be context-aware');
+        advanceTrainingStep(false);
+        if (state.phase !== 'derivatives' || state.trees.length !== 0) throw new Error('training phases: derivatives must appear before a tree is committed');
+        renderPointTable();
+        if (tableHeadings() !== 'Point|Target y|Prediction|Residual|Gradient|Hessian') throw new Error('point table: derivative columns must be context-aware');
+        renderCalculation();
+        if (document.querySelector('#calculation').dataset.phase !== 'derivatives') throw new Error('phase explanation: calculation panel must follow the current training step');
+        advanceTrainingStep(false);
+        if (state.phase !== 'tree' || state.trees.length !== 0) throw new Error('training phases: tree construction must not update predictions');
+        renderLearningState();
+        if (document.querySelector('#phaseTimeline .active')?.dataset.phase !== 'tree') throw new Error('learning state: timeline must highlight the current phase');
+        if (document.querySelectorAll('#candidateSplits .candidate-row').length !== 1) throw new Error('learning state: split phase must show candidate gains');
+        if (document.querySelectorAll('#candidateSplits .candidate-row.best').length !== 1) throw new Error('learning state: best split must be highlighted');
+        renderDataPlot();
+        const splitLabel = document.querySelector('#dataPlot [data-split-label]');
+        if (!splitLabel || Number(splitLabel.getAttribute('y')) < 60) throw new Error('data plot: split annotation must occupy a separate row below the legend');
+        advanceTrainingStep(false);
+        if (state.phase !== 'leaf' || state.trees.length !== 0) throw new Error('training phases: leaf weights must appear before prediction update');
+        renderPointTable();
+        if (tableHeadings() !== 'Point|Leaf|G|H|Leaf Weight') throw new Error('point table: leaf columns must be context-aware');
+        advanceTrainingStep(false);
+        if (state.phase !== 'contribution' || state.trees.length !== 0 || state.predictions.some((value, i) => value !== preds[i])) throw new Error('training phases: contribution must be shown before prediction update');
+        renderPointTable();
+        if (tableHeadings() !== 'Point|Leaf Weight|η|Contribution') throw new Error('point table: contribution columns must be context-aware');
+        if (!document.querySelector('#pointTableHead .value-contribution') || !document.querySelector('#pointTableBody .value-contribution')) throw new Error('point table: contribution column must carry a semantic color class');
+        advanceTrainingStep(false);
+        if (state.phase !== 'update' || state.trees.length !== 0 || state.lossHistory.length !== 2) throw new Error('training phases: update must change predictions and append loss together');
+        renderPointTable();
+        if (tableHeadings() !== 'Point|Previous Prediction|Contribution|Updated Prediction') throw new Error('point table: update columns must be context-aware');
+        if (!document.querySelector('#pointTableBody .value-updated')) throw new Error('point table: updated predictions must carry a semantic color class');
+        advanceTrainingStep(false);
+        if (state.phase !== 'repeat' || state.trees.length !== 1) throw new Error('training phases: repeat step must commit exactly one corrective tree');
+        if (state.stopReason !== 'Maximum of 1 trees reached.') throw new Error('training stop: tree-limit reason must be explicit');
+
+        Object.assign(state, {
+          phase:'update', trees:[], pendingRound:{...round, oldLoss:beforeLoss, improvement:0},
+          lossHistory:[beforeLoss], metricHistory:[errorMetrics(fixture, preds)], stopReason:'',
+          params:{maxTrees:2, learningRate:.3, maxDepth:1, lambda:1, gamma:0, convergenceTolerance:.0001, animationSpeed:700}
+        });
+        advanceTrainingStep(false);
+        if (!state.stopReason.includes('below tolerance')) throw new Error('training stop: convergence-tolerance reason must be explicit');
+      } finally {
+        Object.assign(state, savedState);
+      }
+
+      const savedTrees = state.trees;
+      state.trees = [{
+        type:'split', threshold:8, gain:1, indices:[0,1,2,3,4,5,6,7],
+        left:{
+          type:'split', threshold:2, gain:.5, indices:[0,1,2,3,4,5],
+          left:{type:'leaf', weight:-1, indices:[0,1]},
+          right:{
+            type:'split', threshold:5, gain:.25, indices:[2,3,4,5],
+            left:{type:'leaf', weight:-.5, indices:[2,3]},
+            right:{type:'leaf', weight:.5, indices:[4,5]}
+          }
+        },
+        right:{type:'leaf', weight:1, indices:[6,7]}
+      }];
+      try {
+        renderTreePlot();
+        const leaves = [...document.querySelectorAll('#treePlot rect[stroke="#ffb000"]')]
+          .map(rect => ({x:Number(rect.getAttribute('x')), y:Number(rect.getAttribute('y')), width:Number(rect.getAttribute('width'))}));
+        for (let i = 0; i < leaves.length; i++) {
+          for (let j = i + 1; j < leaves.length; j++) {
+            if (leaves[i].y !== leaves[j].y) continue;
+            const left = leaves[i].x < leaves[j].x ? leaves[i] : leaves[j];
+            const right = left === leaves[i] ? leaves[j] : leaves[i];
+            if (left.x + left.width > right.x) throw new Error('tree layout: leaf boxes overlap at the same depth');
+          }
+        }
+      } finally {
+        state.trees = savedTrees;
+      }
+      document.documentElement.dataset.selfTests = 'passed';
+      console.info('Algorithm self-tests passed');
+    }
+
+    const state = {
+      points: seededPoints.map(point => ({...point})),
+      predictions: [],
+      basePrediction: 0,
+      trees: [],
+      lossHistory: [],
+      metricHistory: [],
+      params: {maxTrees:8, learningRate:.3, maxDepth:2, lambda:1, gamma:0, convergenceTolerance:.0001, animationSpeed:700},
+      mode: 'add', playing: false, timer: null, status: 'Ready',
+      message: 'Model initialized at the mean target value.', snapshot: null,
+      phase: 'dataset', pendingRound: null, stopReason: ''
+    };
+
+    function resetModel(message = 'Model reset to the mean target value.') {
+      stopAutoplay('', false);
+      state.basePrediction = state.points.length ? mean(state.points.map(point => point.y)) : 0;
+      state.predictions = state.points.map(() => state.basePrediction);
+      state.trees = [];
+      state.lossHistory = state.points.length ? [mse(state.points, state.predictions)] : [];
+      state.metricHistory = state.points.length ? [errorMetrics(state.points, state.predictions)] : [];
+      state.snapshot = null;
+      state.pendingRound = null;
+      state.phase = 'dataset';
+      state.stopReason = '';
+      state.status = state.points.length < 4 ? 'Need data' : 'Ready';
+      state.message = state.points.length < 4 ? 'Add at least 4 points before training.' : message;
+      renderAll();
+    }
+
+    function replaceDataset(points) {
+      state.points = points
+        .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+        .map(point => ({x:Math.max(0, Math.min(10, point.x)), y:Math.max(0, Math.min(10, point.y))}))
+        .sort((a, b) => a.x - b.x);
+      resetModel('Dataset changed. The model restarted at the new mean.');
+    }
+
+    function canStartRound(shouldRender = true) {
+      if (state.points.length < 4) {
+        state.status = 'Need data'; state.message = 'Add at least 4 points before training.'; state.stopReason = 'Training needs at least 4 data points.'; stopAutoplay('', false); if (shouldRender) renderAll(); return false;
+      }
+      if (state.trees.length >= state.params.maxTrees) {
+        state.status = 'Tree limit'; state.stopReason = `Maximum of ${state.params.maxTrees} trees reached.`; state.message = state.stopReason; stopAutoplay('', false); if (shouldRender) renderAll(); return false;
+      }
+      return true;
+    }
+
+    function preparePendingRound(shouldRender = true) {
+      if (!canStartRound(shouldRender)) return false;
+      const oldLoss = mse(state.points, state.predictions);
+      const round = applyBoostRound(state.points, state.predictions, state.params);
+      const improvement = oldLoss - round.loss;
+      state.pendingRound = {...round, oldLoss, improvement};
+      state.snapshot = state.pendingRound;
+      state.stopReason = '';
+      return true;
+    }
+
+    function advanceTrainingStep(shouldRender = true) {
+      if (state.phase === 'dataset') {
+        state.phase = 'initial';
+        state.status = state.playing ? 'Training' : 'Inspecting';
+        state.message = `Every sample starts at the mean target, f₀ = ${fmt(state.basePrediction, 3)}.`;
+      } else if (state.phase === 'initial' || state.phase === 'repeat') {
+        if (!preparePendingRound(shouldRender)) return false;
+        state.phase = 'derivatives';
+        state.status = state.playing ? 'Training' : 'Inspecting';
+        state.message = `Round ${state.trees.length + 1}: calculate each gradient and Hessian.`;
+      } else if (state.phase === 'derivatives') {
+        state.phase = 'tree';
+        state.message = `Round ${state.trees.length + 1}: compare candidate split gains and choose the largest.`;
+      } else if (state.phase === 'tree') {
+        state.phase = 'leaf';
+        state.message = `Round ${state.trees.length + 1}: calculate the correction stored in every leaf.`;
+      } else if (state.phase === 'leaf') {
+        state.phase = 'contribution';
+        state.message = `Round ${state.trees.length + 1}: scale each leaf weight by η = ${fmt(state.params.learningRate, 2)}.`;
+      } else if (state.phase === 'contribution') {
+        const round = state.pendingRound;
+        state.predictions = [...round.updated];
+        state.lossHistory.push(round.loss);
+        state.metricHistory.push(errorMetrics(state.points, round.updated));
+        state.phase = 'update';
+        state.message = `Round ${state.trees.length + 1}: update predictions; MSE decreased by ${fmt(round.improvement, 4)}.`;
+      } else if (state.phase === 'update') {
+        const round = state.pendingRound;
+        state.trees.push(round.tree);
+        state.phase = 'repeat';
+        state.message = `Tree ${state.trees.length} is committed. The updated prediction is the next tree's baseline.`;
+        if (round.improvement < state.params.convergenceTolerance) {
+          state.status = 'Converged';
+          state.stopReason = `Loss improvement ${fmt(round.improvement, 8)} is below tolerance ${fmt(state.params.convergenceTolerance, 7)}.`;
+          state.message = `Training stopped: ${state.stopReason}`;
+          stopAutoplay('', false);
+        } else if (state.trees.length >= state.params.maxTrees) {
+          state.status = 'Tree limit';
+          state.stopReason = `Maximum of ${state.params.maxTrees} trees reached.`;
+          state.message = `Training stopped: ${state.stopReason}`;
+          stopAutoplay('', false);
+        } else {
+          state.status = state.playing ? 'Training' : 'Ready for next tree';
+          state.message = `Round ${state.trees.length} complete. The updated prediction now becomes the baseline for corrective tree ${state.trees.length + 1}.`;
+        }
+      }
+      if (shouldRender) renderAll();
+      return true;
+    }
+
+    function trainOneRound(shouldRender = true) {
+      if (state.phase !== 'dataset' && state.phase !== 'initial' && state.phase !== 'repeat') {
+        while (state.phase !== 'repeat' && advanceTrainingStep(false)) {}
+      } else {
+        if (!advanceTrainingStep(false)) { if (shouldRender) renderAll(); return false; }
+        while (state.phase !== 'repeat' && advanceTrainingStep(false)) {}
+      }
+      if (shouldRender) renderAll();
+      return true;
+    }
+
+    function startAutoplay() {
+      if (state.playing || state.points.length < 4 || (state.phase === 'repeat' && state.stopReason)) return;
+      state.playing = true; state.status = 'Training'; state.message = 'Training one visible XGBoost phase at a time…'; renderAll();
+      advanceTrainingStep();
+      if (state.playing) state.timer = window.setInterval(advanceTrainingStep, state.params.animationSpeed);
+    }
+
+    function stopAutoplay(message = 'Training paused at the current step.', shouldRender = true) {
+      if (state.timer) window.clearInterval(state.timer);
+      state.timer = null;
+      const wasPlaying = state.playing;
+      state.playing = false;
+      if (message && wasPlaying) { state.status = 'Paused'; state.message = message; }
+      if (shouldRender && document.readyState !== 'loading') renderAll();
+    }
+
+    function svgEl(name, attrs = {}, text = '') {
+      const node = document.createElementNS(SVG_NS, name);
+      Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function resetSvg(svg, title, desc) {
+      svg.replaceChildren(svgEl('title', {}, title), svgEl('desc', {}, desc));
+    }
+
+    function renderDataPlot() {
+      const svg = $('#dataPlot');
+      resetSvg(svg, 'XGBoost regression data canvas', 'Training targets, residual stems, current ensemble prediction, and the newest split.');
+      const W = 720, H = 430, p = {l:58,r:24,t:24,b:48};
+      const sx = x => p.l + (x / 10) * (W - p.l - p.r);
+      const sy = y => H - p.b - (y / 10) * (H - p.t - p.b);
+      for (let i = 0; i <= 10; i += 2) {
+        svg.append(svgEl('line',{x1:sx(i),y1:p.t,x2:sx(i),y2:H-p.b,stroke:PALETTE.line,'stroke-width':1}));
+        svg.append(svgEl('line',{x1:p.l,y1:sy(i),x2:W-p.r,y2:sy(i),stroke:PALETTE.line,'stroke-width':1}));
+        svg.append(svgEl('text',{x:sx(i),y:H-20,fill:PALETTE.muted,'font-size':10,'text-anchor':'middle'},String(i)));
+        svg.append(svgEl('text',{x:42,y:sy(i)+4,fill:PALETTE.muted,'font-size':10,'text-anchor':'end'},String(i)));
+      }
+      svg.append(svgEl('text',{x:(p.l+W-p.r)/2,y:H-10,fill:PALETTE.muted,'font-size':10,'text-anchor':'middle'},'INPUT x'));
+      const yTitleCenter=(p.t+H-p.b)/2;
+      svg.append(svgEl('text',{x:16,y:yTitleCenter,fill:PALETTE.muted,'font-size':10,'text-anchor':'middle',transform:`rotate(-90 16 ${yTitleCenter})`},'TARGET y'));
+      if (!state.points.length) {
+        svg.append(svgEl('text',{x:W/2,y:H/2,fill:PALETTE.muted,'font-size':14,'text-anchor':'middle'},'EMPTY CANVAS — CLICK TO ADD TRAINING POINTS'));
+        return;
+      }
+      if (state.phase !== 'dataset') {
+        state.points.forEach((point, i) => {
+          const prediction = state.predictions[i] ?? state.basePrediction;
+          svg.append(svgEl('line',{x1:sx(point.x),y1:sy(prediction),x2:sx(point.x),y2:sy(point.y),stroke:point.y >= prediction ? PALETTE.teal : PALETTE.red,'stroke-width':1.5,'stroke-dasharray':'4 4',opacity:.7}));
+        });
+        const samples = Array.from({length:161}, (_, i) => i * 10 / 160);
+        const showPendingUpdate = state.phase === 'update' && state.pendingRound;
+        const predictionPoints = samples.map(x => {
+          const committed = state.trees.reduce((total, tree) => total + state.params.learningRate * predictTree(tree, x), 0);
+          const pending = showPendingUpdate ? state.params.learningRate * predictTree(state.pendingRound.tree, x) : 0;
+          const y = state.basePrediction + committed + pending;
+          return `${sx(x)},${sy(Math.max(0, Math.min(10, y)))}`;
+        }).join(' ');
+        svg.append(svgEl('polyline',{points:predictionPoints,fill:'none',stroke:PALETTE.amber,'stroke-width':3,'stroke-linejoin':'round'}));
+      }
+      const latest = ['tree','leaf','contribution','update'].includes(state.phase) && state.pendingRound ? state.pendingRound.tree : state.trees.at(-1);
+      if (latest?.type === 'split') {
+        const splitX = sx(latest.threshold);
+        const placeLeft = splitX > W - p.r - 150;
+        const labelX = splitX + (placeLeft ? -8 : 8);
+        const labelY = 68;
+        const labelWidth = 142;
+        svg.append(svgEl('line',{x1:splitX,y1:p.t,x2:splitX,y2:H-p.b,stroke:PALETTE.amberSoft,'stroke-width':1.5,'stroke-dasharray':'7 5'}));
+        svg.append(svgEl('rect',{x:placeLeft?labelX-labelWidth:labelX-4,y:labelY-14,width:labelWidth,height:20,rx:2,fill:'#0a0a08',opacity:.92}));
+        svg.append(svgEl('text',{x:labelX,y:labelY,fill:PALETTE.amberSoft,'font-size':10,'font-weight':700,'text-anchor':placeLeft?'end':'start','data-split-label':''},`NEW SPLIT x < ${fmt(latest.threshold,2)}`));
+      }
+      state.points.forEach((point, i) => {
+        const group = svgEl('g', {'data-point-index':i});
+        const circle = svgEl('circle',{cx:sx(point.x),cy:sy(point.y),r:7,fill:PALETTE.paper,stroke:'#080806','stroke-width':3});
+        circle.append(svgEl('title',{},`Point ${i+1}: x ${fmt(point.x,2)}, target ${fmt(point.y,2)}, prediction ${fmt(state.predictions[i],2)}`));
+        group.append(circle); svg.append(group);
+      });
+      const legend = svgEl('g',{});
+      if (state.phase !== 'dataset') {
+        legend.append(svgEl('line',{x1:70,y1:42,x2:96,y2:42,stroke:PALETTE.amber,'stroke-width':3}));
+        legend.append(svgEl('text',{x:104,y:46,fill:PALETTE.muted,'font-size':10},'CURRENT PREDICTION'));
+      }
+      legend.append(svgEl('circle',{cx:state.phase === 'dataset' ? 70 : 264,cy:42,r:5,fill:PALETTE.paper}));
+      legend.append(svgEl('text',{x:state.phase === 'dataset' ? 82 : 276,y:46,fill:PALETTE.muted,'font-size':10},'TARGET'));
+      svg.append(legend);
+    }
+
+    function renderLearningState() {
+      const activeIndex = PHASES.indexOf(state.phase);
+      document.querySelectorAll('#phaseTimeline .phase-step').forEach(step => {
+        const index = PHASES.indexOf(step.dataset.phase);
+        step.classList.toggle('active', index === activeIndex);
+        step.classList.toggle('complete', index < activeIndex);
+        if (index === activeIndex) step.setAttribute('aria-current', 'step');
+        else step.removeAttribute('aria-current');
+      });
+
+      const nextLabels = {
+        dataset:'Next: initial prediction', initial:'Next: gradients & hessians', derivatives:'Next: find best split',
+        tree:'Next: leaf weights', leaf:'Next: tree contribution', contribution:'Next: update prediction & loss',
+        update:'Next: add tree & repeat', repeat:`Next: gradients for tree ${state.trees.length + 1}`
+      };
+      $('#stepButton').textContent = state.stopReason ? 'Training complete' : nextLabels[state.phase] || 'Next step';
+      const reason = $('#stopReason');
+      reason.textContent = state.stopReason ? `Why training stopped — ${state.stopReason}` : '';
+      reason.classList.toggle('visible', Boolean(state.stopReason));
+
+      const candidateBox = $('#candidateSplits');
+      const showCandidates = state.phase === 'tree';
+      candidateBox.hidden = !showCandidates;
+      const candidates = showCandidates ? state.pendingRound?.tree.candidates || [] : [];
+      if (candidates.length) {
+        const maxGain = Math.max(...candidates.map(candidate => Math.max(0, candidate.gain)), .001);
+        const hasWinner = candidates.some(candidate => candidate.best);
+        candidateBox.innerHTML = `<div class="candidate-head"><strong>Candidate root splits</strong><span>${hasWinner?'Largest positive gain wins':'No gain cleared the threshold'}</span></div><div class="candidate-list">${candidates.map(candidate => `<div class="candidate-row ${candidate.best ? 'best' : ''}"><span>x &lt; ${fmt(candidate.threshold,2)}${candidate.best ? ' · BEST' : ''}<small>P${candidate.left.map(i=>i+1).join(', P')} left · P${candidate.right.map(i=>i+1).join(', P')} right</small></span><span class="candidate-bar"><i style="width:${Math.max(2, Math.max(0,candidate.gain)/maxGain*100)}%"></i></span><span>gain ${fmt(candidate.gain,3)}</span></div>`).join('')}</div>`;
+      } else if (state.pendingRound?.tree.type === 'leaf' && showCandidates) {
+        candidateBox.innerHTML = '<div class="candidate-empty">There are not enough distinct samples to form another valid split, so this round uses one regularized leaf.</div>';
+      } else {
+        candidateBox.innerHTML = '<div class="candidate-empty">Candidate thresholds, branch assignments, and gains appear at Step 4.</div>';
+      }
+
+      const terms = state.trees.map((_, index) => `ηf<sub>${index + 1}</sub>`);
+      const pendingTerm = ['contribution','update'].includes(state.phase) && state.pendingRound ? ` + <span class="pending-term">ηf<sub>${state.trees.length + 1}</sub> pending</span>` : '';
+      $('#ensembleEquation').innerHTML = `ŷ = f<sub>0</sub>${terms.length ? ` + ${terms.join(' + ')}` : ''}${pendingTerm}`;
+      $('#ensembleCaption').textContent = pendingTerm
+        ? 'The dashed correction has been evaluated; it joins the ensemble only at Step 8.'
+        : `${state.trees.length} corrective ${state.trees.length === 1 ? 'tree has' : 'trees have'} joined f₀. Each remains small; together they form the model.`;
+      const showTree = ['tree','leaf','contribution','update','repeat'].includes(state.phase);
+      $('#decisionTreeSection').hidden = !showTree;
+      $('#ensemblePanel').hidden = state.phase !== 'repeat' && state.phase !== 'contribution' && state.phase !== 'update';
+      $('#ensembleList').hidden = state.phase !== 'repeat';
+      $('#residualGuide').hidden = !['derivatives','tree','leaf','contribution','update','repeat'].includes(state.phase);
+
+    }
+
+    function renderCalculation() {
+      const box = $('#calculation');
+      box.dataset.phase = state.phase;
+      if (!state.points.length) {
+        box.innerHTML = '<h3>Waiting for data</h3><p>Add at least four points to begin. XGBoost needs examples before it can measure mistakes.</p>';
+        return;
+      }
+      if (state.phase === 'dataset') {
+        box.innerHTML = `<span class="concept-tag">Step 1 · Input Dataset</span><h3>Start with examples</h3>${stepAnswers(`Read ${state.points.length} input–target pairs.`,`The model needs examples to learn from.`,`Only the dataset is visible; no tree is calculated.`)}<p class="math-line">D = {(xᵢ, yᵢ)}ᵢ₌₁ⁿ &nbsp;·&nbsp; n = ${state.points.length}</p>`;
+        return;
+      }
+      if (state.phase === 'initial' || !state.pendingRound) {
+        box.innerHTML = `<span class="concept-tag">Step 2 · Initial Prediction</span><h3>Set one baseline</h3>${stepAnswers(`Assign the mean target to every point.`,`Boosting needs a prediction to improve.`,`Every prediction becomes ${fmt(state.basePrediction,3)}; the ensemble is still empty.`)}<p class="math-line">f₀ = ȳ = ${fmt(state.basePrediction,3)}</p>`;
+        return;
+      }
+      const s = state.pendingRound;
+      const tree = s.tree;
+
+      if (state.phase === 'derivatives') {
+        const residuals = state.points.map((point, index) => point.y - s.previous[index]);
+        box.innerHTML = `<span class="concept-tag">Step 3 · Gradients &amp; Hessians</span><h3>Measure current mistakes</h3>${stepAnswers(`Calculate residual, gradient, and Hessian for every point.`,`They describe the direction and curvature of the correction.`,`${residuals.filter(value=>value>0).length} corrections point up; ${residuals.filter(value=>value<0).length} point down.`)}<p class="math-line">residualᵢ = yᵢ − ŷᵢ &nbsp;·&nbsp; gᵢ = ŷᵢ − yᵢ &nbsp;·&nbsp; hᵢ = 1</p>`;
+      } else if (state.phase === 'tree' && tree.type === 'split') {
+        const lt = totals(tree.left.indices, s.gradients, s.hessians);
+        const rt = totals(tree.right.indices, s.gradients, s.hessians);
+        const all = totals(tree.indices, s.gradients, s.hessians);
+        box.innerHTML = `<span class="concept-tag">Step 4 · Find the Best Split</span><h3>Compare candidate gains</h3>${stepAnswers(`Score every valid threshold.`,`A good split groups similar correction signals.`,`x &lt; ${fmt(tree.threshold,2)} wins with gain ${fmt(tree.gain,4)}.`)}<p class="math-line">Gain = ½[Gᴸ²/(Hᴸ+λ) + Gᴿ²/(Hᴿ+λ) − G²/(H+λ)] − γ</p><p>½[${fmt(lt.G,2)}²/(${fmt(lt.H,0)}+${fmt(state.params.lambda,1)}) + ${fmt(rt.G,2)}²/(${fmt(rt.H,0)}+${fmt(state.params.lambda,1)}) − ${fmt(all.G,2)}²/(${fmt(all.H,0)}+${fmt(state.params.lambda,1)})] − ${fmt(state.params.gamma,2)} = <strong>${fmt(tree.gain,4)}</strong></p>`;
+      } else if (state.phase === 'tree') {
+        box.innerHTML = `<span class="concept-tag">Step 4 · Find the Best Split</span><h3>No useful split</h3>${stepAnswers(`Compare every valid threshold.`,`Only positive regularized gain justifies more structure.`,`The tree remains one shared leaf.`)}`;
+      } else if (state.phase === 'leaf') {
+        const leaves = collectLeaves(tree);
+        box.innerHTML = `<span class="concept-tag">Step 5 · Leaf Weights</span><h3>Calculate correction sizes</h3>${stepAnswers(`Aggregate G and H inside each leaf.`,`One shared weight corrects all samples in that leaf.`,`Each leaf receives a regularized weight.`)}<p class="math-line">wⱼ = −Gⱼ / (Hⱼ + λ)</p><p>${leaves.map((leaf,index)=>{const t=totals(leaf.indices,s.gradients,s.hessians);return `L${index+1}: −(${fmt(t.G,3)}) / (${fmt(t.H,0)} + ${fmt(state.params.lambda,1)}) = <strong>${fmt(leaf.weight,3)}</strong>`;}).join(' &nbsp;·&nbsp; ')}</p>`;
+      } else if (state.phase === 'contribution') {
+        const sample = 0;
+        box.innerHTML = `<span class="concept-tag">Step 6 · Tree Contribution</span><h3>Scale each correction</h3>${stepAnswers(`Multiply each leaf weight by η.`,`Small updates make boosting controlled and stable.`,`Every point receives a pending contribution.`)}<p class="math-line">Contributionᵢ = η × fₜ(xᵢ)</p><p>P01: ${fmt(s.treeOutputs[sample],3)} × ${fmt(state.params.learningRate,2)} = <strong>${fmt(state.params.learningRate*s.treeOutputs[sample],3)}</strong></p>`;
+      } else if (state.phase === 'update') {
+        box.innerHTML = `<span class="concept-tag">Step 7 · Update Prediction &amp; Loss</span><h3>Apply and measure</h3>${stepAnswers(`Add each contribution to its previous prediction.`,`The new MSE shows whether the tree helped.`,`Predictions update; MSE moves ${fmt(s.oldLoss,4)} → ${fmt(s.loss,4)}.`)}<p class="math-line">ŷ(new) = ŷ(previous) + contribution &nbsp;·&nbsp; MSE = 1/n Σ(yᵢ−ŷᵢ)²</p><p>RMSE ${fmt(Math.sqrt(s.loss),4)} · MAE ${fmt(errorMetrics(state.points,s.updated).mae,4)} · improvement ${fmt(s.improvement,4)}</p>`;
+      } else if (state.phase === 'repeat') {
+        box.innerHTML = `<span class="concept-tag">Step 8 · Add Tree &amp; Repeat</span><h3>Commit tree ${state.trees.length}</h3>${stepAnswers(`Add the corrective tree to the ensemble.`,`Committed trees combine into the final model.`,`The updated prediction becomes the next tree's baseline.`)}<p class="math-line">ŷ = f₀ + ${state.trees.map((_,index)=>`ηf${index+1}`).join(' + ')}</p>${state.stopReason ? `<p>${state.stopReason}</p>` : ''}`;
+      }
+    }
+
+    function makeTreeLayout(tree) {
+      const leaves = [];
+      const positions = new Map();
+      function collectLeaves(node) {
+        if (node.type === 'leaf') { leaves.push(node); return; }
+        collectLeaves(node.left);
+        collectLeaves(node.right);
+      }
+      collectLeaves(tree);
+      const slotSpacing = 168;
+      const width = Math.max(720, 144 + (leaves.length - 1) * slotSpacing);
+      const firstLeafX = (width - (leaves.length - 1) * slotSpacing) / 2;
+      leaves.forEach((leaf, index) => positions.set(leaf, {x:firstLeafX + index * slotSpacing}));
+      function positionSplits(node, depth = 0) {
+        if (node.type === 'leaf') {
+          positions.get(node).depth = depth;
+          return positions.get(node).x;
+        }
+        const leftX = positionSplits(node.left, depth + 1);
+        const rightX = positionSplits(node.right, depth + 1);
+        const x = (leftX + rightX) / 2;
+        positions.set(node, {x, depth});
+        return x;
+      }
+      positionSplits(tree);
+      return {width, positions};
+    }
+
+    function renderTreePlot() {
+      const svg = $('#treePlot');
+      resetSvg(svg, 'Current XGBoost decision tree', 'Newest tree with split thresholds, gains, and leaf weights.');
+      const treeIsPending = ['tree','leaf','contribution','update'].includes(state.phase) && state.pendingRound;
+      const tree = treeIsPending ? state.pendingRound.tree : state.trees.at(-1);
+      const treeState = $('#treeState');
+      if (treeIsPending) treeState.innerHTML = `<strong>Pending tree ${state.trees.length + 1}</strong> · being built now · commits at Step 8`;
+      else if (tree) treeState.innerHTML = `<strong>Completed tree ${state.trees.length}</strong> · committed to the ensemble`;
+      else treeState.textContent = 'No corrective tree is being built yet.';
+      if (!tree) {
+        svg.setAttribute('viewBox', '0 0 720 310');
+        svg.style.width = '100%';
+        svg.append(svgEl('text',{x:360,y:145,fill:PALETTE.muted,'font-size':13,'text-anchor':'middle'},'ADVANCE TO BEST SPLIT TO REVEAL THE TREE'));
+        svg.append(svgEl('circle',{cx:360,cy:90,r:5,fill:PALETTE.amber}));
+        svg.append(svgEl('line',{x1:360,y1:95,x2:360,y2:120,stroke:PALETTE.line}));
+        return;
+      }
+      const maxDepth = node => node.type === 'leaf' ? 0 : 1 + Math.max(maxDepth(node.left), maxDepth(node.right));
+      const depthCount = maxDepth(tree);
+      const layout = makeTreeLayout(tree);
+      svg.setAttribute('viewBox', `0 0 ${layout.width} 310`);
+      svg.style.width = `${layout.width / 7.2}%`;
+      const yFor = depth => 48 + depth * (220 / Math.max(1, depthCount));
+      function drawEdges(node) {
+        if (node.type === 'leaf') return;
+        const {x, depth} = layout.positions.get(node);
+        const y = yFor(depth);
+        const lx = layout.positions.get(node.left).x;
+        const rx = layout.positions.get(node.right).x;
+        const cy = yFor(depth + 1);
+        svg.append(svgEl('line',{x1:x,y1:y+22,x2:lx,y2:cy-20,stroke:PALETTE.line,'stroke-width':2}));
+        svg.append(svgEl('line',{x1:x,y1:y+22,x2:rx,y2:cy-20,stroke:PALETTE.line,'stroke-width':2}));
+        svg.append(svgEl('text',{x:(x+lx)/2-5,y:(y+cy)/2,fill:PALETTE.teal,'font-size':9,'text-anchor':'end'},'YES'));
+        svg.append(svgEl('text',{x:(x+rx)/2+5,y:(y+cy)/2,fill:PALETTE.red,'font-size':9},'NO'));
+        drawEdges(node.left); drawEdges(node.right);
+      }
+      function drawNodes(node) {
+        const {x, depth} = layout.positions.get(node);
+        const y = yFor(depth);
+        if (node.type === 'leaf') {
+          svg.append(svgEl('rect',{x:x-64,y:y-22,width:128,height:44,rx:2,fill:'rgba(255,176,0,.11)',stroke:PALETTE.amber}));
+          const weightLabel = state.phase === 'tree' ? 'LEAF WEIGHT PENDING' : `LEAF w = ${fmt(node.weight,3)}`;
+          svg.append(svgEl('text',{x,y:y-2,fill:PALETTE.amber,'font-size':11,'font-weight':700,'text-anchor':'middle'},weightLabel));
+          svg.append(svgEl('text',{x,y:y+13,fill:PALETTE.muted,'font-size':9,'text-anchor':'middle'},`${node.indices.length} SAMPLES`));
+        } else {
+          svg.append(svgEl('rect',{x:x-72,y:y-24,width:144,height:48,rx:2,fill:PALETTE.surface,stroke:PALETTE.paper}));
+          svg.append(svgEl('text',{x,y:y-3,fill:PALETTE.paper,'font-size':11,'font-weight':700,'text-anchor':'middle'},`x < ${fmt(node.threshold,2)} ?`));
+          svg.append(svgEl('text',{x,y:y+13,fill:PALETTE.muted,'font-size':9,'text-anchor':'middle'},`GAIN ${fmt(node.gain,3)} · n=${node.indices.length}`));
+          drawNodes(node.left); drawNodes(node.right);
+        }
+      }
+      drawEdges(tree); drawNodes(tree);
+    }
+
+    function renderEnsembleList() {
+      const list = $('#ensembleList');
+      if (!state.trees.length) { list.innerHTML = '<div class="empty-state">No corrective trees yet. The pending tree will appear here only after Step 8.</div>'; return; }
+      list.innerHTML = state.trees.map((tree, i) => {
+        const rule = tree.type === 'split' ? `Root rule: x < ${fmt(tree.threshold,2)}` : `Single leaf: w = ${fmt(tree.weight,3)}`;
+        const gain = tree.type === 'split' ? `gain ${fmt(tree.gain,3)}` : 'no split';
+        return `<div class="ensemble-item"><div class="tree-number">T${String(i+1).padStart(2,'0')}</div><div class="tree-rule">${rule} · scaled by η ${fmt(state.params.learningRate,2)}</div><div class="tree-gain">${gain}</div></div>`;
+      }).join('');
+    }
+
+    function renderPointTable() {
+      const snapshot = state.snapshot;
+      const directionClass = value => value > 1e-12 ? 'correction-up' : value < -1e-12 ? 'correction-down' : 'correction-zero';
+      const pointColumn = ['Point',(_,i)=>`P${String(i+1).padStart(2,'0')}`,'value-point'];
+      const leafDetails = index => {
+        const leaves = collectLeaves(snapshot.tree);
+        const leaf = leafForX(snapshot.tree, state.points[index].x);
+        return {leaf, label:`L${leaves.indexOf(leaf)+1}`, ...totals(leaf.indices,snapshot.gradients,snapshot.hessians)};
+      };
+      const contribution = index => state.params.learningRate * snapshot.treeOutputs[index];
+      let columns;
+      let key = '';
+      if (state.phase === 'dataset') {
+        columns = [pointColumn,['x',p=>fmt(p.x,2),'value-x'],['Target y',p=>fmt(p.y,2),'value-target']];
+      } else if (state.phase === 'initial') {
+        columns = [pointColumn,['x',p=>fmt(p.x,2),'value-x'],['Target y',p=>fmt(p.y,2),'value-target'],['Prediction',(_,i)=>fmt(state.predictions[i],3),'value-previous']];
+        key = '<span class="key-previous">Prediction</span>';
+      } else if (state.phase === 'derivatives') {
+        columns = [pointColumn,['Target y',p=>fmt(p.y,2),'value-target'],['Prediction',(_,i)=>fmt(snapshot.previous[i],3),'value-previous'],['Residual',(p,i)=>fmt(p.y-snapshot.previous[i],3),(p,i)=>`value-residual ${directionClass(p.y-snapshot.previous[i])}`],['Gradient',(_,i)=>fmt(snapshot.gradients[i],3),(_,i)=>`value-gradient ${directionClass(-snapshot.gradients[i])}`],['Hessian',(_,i)=>fmt(snapshot.hessians[i],0),'value-hessian']];
+        key = '<span class="key-up">Upward correction</span><span class="key-down">Downward correction</span>';
+      } else if (state.phase === 'tree') {
+        columns = [pointColumn,['x',p=>fmt(p.x,2),'value-x'],['Branch / split assignment',(p)=>treePath(snapshot.tree,p.x),'value-previous']];
+      } else if (state.phase === 'leaf') {
+        columns = [pointColumn,['Leaf',(_,i)=>leafDetails(i).label,'value-previous'],['G',(_,i)=>fmt(leafDetails(i).G,3),(_,i)=>`value-gradient ${directionClass(-leafDetails(i).G)}`],['H',(_,i)=>fmt(leafDetails(i).H,0),'value-hessian'],['Leaf Weight',(_,i)=>fmt(leafDetails(i).leaf.weight,3),'value-leaf']];
+        key = '<span class="key-up">Positive correction</span><span class="key-down">Negative correction</span>';
+      } else if (state.phase === 'contribution') {
+        columns = [pointColumn,['Leaf Weight',(_,i)=>fmt(snapshot.treeOutputs[i],3),'value-leaf'],['η',()=>fmt(state.params.learningRate,2),'value-hessian'],['Contribution',(_,i)=>fmt(contribution(i),3),'value-contribution']];
+        key = '<span class="key-contribution">Scaled contribution</span>';
+      } else if (state.phase === 'update') {
+        columns = [pointColumn,['Previous Prediction',(_,i)=>fmt(snapshot.previous[i],3),'value-previous'],['Contribution',(_,i)=>fmt(contribution(i),3),'value-contribution'],['Updated Prediction',(_,i)=>fmt(snapshot.updated[i],3),'value-updated']];
+        key = '<span class="key-previous">Previous</span><span class="key-contribution">Contribution</span><span class="key-updated">Updated</span>';
+      } else {
+        columns = [pointColumn,['Updated Prediction',(_,i)=>fmt(snapshot?.updated[i] ?? state.predictions[i],3),'value-updated'],['Committed Tree',()=>`T${String(state.trees.length).padStart(2,'0')}`,'value-contribution']];
+        key = '<span class="key-updated">Next-round baseline</span>';
+      }
+      $('#tableColorKey').innerHTML = key;
+      $('#tableColorKey').hidden = !key;
+      $('#pointTableHead').innerHTML = columns.map(([label,,className])=>`<th class="${typeof className === 'string' ? className : ''}">${label}</th>`).join('');
+      $('#pointTableBody').innerHTML = state.points.map((point, i) => {
+        return `<tr>${columns.map(([,value,className])=>`<td class="${typeof className === 'function' ? className(point,i) : className || ''}">${value(point,i)}</td>`).join('')}</tr>`;
+      }).join('') || `<tr><td colspan="${columns.length}" style="text-align:center;color:#858278">No points to display</td></tr>`;
+    }
+
+    function renderLossPlot() {
+      const svg = $('#lossPlot');
+      resetSvg(svg, 'Error metrics by boosting round', 'MSE, RMSE, and MAE curves for the current XGBoost ensemble. Hover or focus a round for exact values.');
+      const history = state.metricHistory;
+      const W=720,H=300,p={l:64,r:32,t:62,b:48};
+      if (state.phase === 'dataset') { svg.append(svgEl('text',{x:360,y:150,fill:PALETTE.muted,'font-size':13,'text-anchor':'middle'},'LOSS APPEARS AFTER THE INITIAL PREDICTION')); return; }
+      if (!history.length) { svg.append(svgEl('text',{x:360,y:150,fill:PALETTE.muted,'font-size':13,'text-anchor':'middle'},'METRICS APPEAR AFTER DATA IS ADDED')); return; }
+      const metrics = [
+        {key:'mse', label:'MSE · PRIMARY', color:PALETTE.amber, primary:true},
+        {key:'rmse', label:'RMSE', color:PALETTE.teal, primary:false},
+        {key:'mae', label:'MAE', color:PALETTE.red, primary:false}
+      ];
+      metrics.forEach((metric,i)=>{
+        const x=64+i*150;
+        svg.append(svgEl('line',{x1:x,y1:24,x2:x+22,y2:24,stroke:metric.color,'stroke-width':metric.primary?4:1.5,'stroke-linecap':'round',opacity:metric.primary?1:.5,'stroke-dasharray':metric.primary?'none':'5 4','data-loss-legend':metric.key}));
+        svg.append(svgEl('text',{x:x+30,y:28,fill:PALETTE.muted,'font-size':10},metric.label));
+      });
+      const ceiling = Math.max(...history.flatMap(entry=>metrics.map(metric=>entry[metric.key])), .001) * 1.14;
+      const sx = i => p.l + (history.length === 1 ? 0 : i/(history.length-1))*(W-p.l-p.r);
+      const sy = v => H-p.b-(v/ceiling)*(H-p.t-p.b);
+      for(let i=0;i<=4;i++){
+        const v=ceiling*i/4, y=sy(v);
+        svg.append(svgEl('line',{x1:p.l,y1:y,x2:W-p.r,y2:y,stroke:PALETTE.line}));
+        svg.append(svgEl('text',{x:p.l-10,y:y+4,fill:PALETTE.muted,'font-size':9,'text-anchor':'end'},fmt(v,2)));
+      }
+      history.forEach((_,i)=>svg.append(svgEl('text',{x:sx(i),y:H-22,fill:PALETTE.muted,'font-size':9,'text-anchor':'middle'},String(i))));
+      metrics.forEach(metric=>{
+        const points=history.map((entry,i)=>`${sx(i)},${sy(entry[metric.key])}`).join(' ');
+        svg.append(svgEl('polyline',{points,fill:'none',stroke:metric.color,'stroke-width':metric.primary?4:1.5,'stroke-linecap':'round','stroke-linejoin':'round','stroke-dasharray':metric.primary?'none':'6 5',opacity:metric.primary?1:.48,class:'loss-line','data-metric-series':metric.key}));
+        history.forEach((entry,i)=>svg.append(svgEl('circle',{cx:sx(i),cy:sy(entry[metric.key]),r:metric.primary?(i===history.length-1?5:3.5):2.5,fill:PALETTE.surface,stroke:metric.color,'stroke-width':metric.primary?2:1.5,opacity:metric.primary?1:.55,'data-metric-point':metric.key})));
+      });
+
+      const tooltip=svgEl('g',{'data-loss-tooltip':'','class':'loss-tooltip',opacity:0});
+      svg.append(tooltip);
+      function showTooltip(index) {
+        const entry=history[index], x=sx(index);
+        const boxX=x>W-215?x-184:x+13, boxY=52;
+        tooltip.replaceChildren();
+        tooltip.append(svgEl('line',{x1:x,y1:p.t,x2:x,y2:H-p.b,stroke:PALETTE.paper,'stroke-width':1,'stroke-dasharray':'3 4',opacity:.35}));
+        tooltip.append(svgEl('rect',{x:boxX,y:boxY,width:171,height:96,rx:2,fill:'#090908',stroke:PALETTE.paper,'stroke-width':1}));
+        tooltip.append(svgEl('text',{x:boxX+12,y:boxY+19,fill:PALETTE.paper,'font-size':10,'font-weight':700},`ROUND ${index}`));
+        metrics.forEach((metric,i)=>{
+          tooltip.append(svgEl('circle',{cx:boxX+15,cy:boxY+39+i*18,r:3.5,fill:metric.color}));
+          tooltip.append(svgEl('text',{x:boxX+26,y:boxY+43+i*18,fill:PALETTE.muted,'font-size':10},`${metric.label}  ${fmt(entry[metric.key],4)}`));
+        });
+        tooltip.setAttribute('opacity','1');
+      }
+      function hideTooltip() { tooltip.setAttribute('opacity','0'); }
+      const hitWidth=Math.max(28,(W-p.l-p.r)/Math.max(1,history.length));
+      history.forEach((entry,i)=>{
+        const label=`Round ${i}: MSE ${fmt(entry.mse,4)}, RMSE ${fmt(entry.rmse,4)}, MAE ${fmt(entry.mae,4)}`;
+        const hit=svgEl('rect',{x:sx(i)-hitWidth/2,y:p.t,width:hitWidth,height:H-p.t-p.b,fill:'transparent',class:'loss-hit',tabindex:0,role:'button','aria-label':label,'data-loss-round':i});
+        hit.addEventListener('pointerenter',()=>showTooltip(i));
+        hit.addEventListener('pointerleave',hideTooltip);
+        hit.addEventListener('focus',()=>showTooltip(i));
+        hit.addEventListener('blur',hideTooltip);
+        hit.addEventListener('pointerdown',()=>showTooltip(i));
+        svg.insertBefore(hit,tooltip);
+      });
+      svg.append(svgEl('text',{x:W-p.r,y:H-9,fill:PALETTE.muted,'font-size':9,'text-anchor':'end'},'BOOSTING ROUND'));
+    }
+
+    function renderHeaderStatus() {
+      $('#roundValue').textContent = `${state.trees.length} / ${state.params.maxTrees}`;
+      $('#lossValue').textContent = state.phase !== 'dataset' && state.lossHistory.length ? fmt(state.lossHistory.at(-1),4) : '—';
+      $('#statusValue').textContent = state.status;
+      $('#liveMessage').textContent = state.message;
+      $('.status-dot').style.background = ['Converged','Tree limit'].includes(state.status) ? PALETTE.amber : state.status === 'Need data' ? PALETTE.red : PALETTE.teal;
+    }
+
+    function syncControls() {
+      const insufficient = state.points.length < 4;
+      const terminal = state.phase === 'repeat' && Boolean(state.stopReason);
+      $('#stepButton').disabled = state.playing || insufficient || terminal;
+      $('#playButton').disabled = state.playing || insufficient || terminal;
+      $('#pauseButton').disabled = !state.playing;
+      $('#randomize').disabled = state.playing; $('#clearData').disabled = state.playing;
+      $('#addMode').disabled = state.playing; $('#deleteMode').disabled = state.playing;
+      $('#resetButton').disabled = state.playing;
+      ['maxTrees','learningRate','maxDepth','lambda','gamma','tolerance'].forEach(id => $(`#${id}`).disabled = state.playing);
+      $('#addMode').classList.toggle('mode-active', state.mode === 'add');
+      $('#deleteMode').classList.toggle('mode-active', state.mode === 'delete');
+      $('#canvasHint').textContent = state.mode === 'add' ? 'Click anywhere inside the plot to add a point.' : 'Click near a point to remove it.';
+    }
+
+    function renderAll() {
+      renderHeaderStatus(); renderLearningState(); renderDataPlot(); renderCalculation(); renderTreePlot(); renderEnsembleList(); renderPointTable(); renderLossPlot(); syncControls();
+    }
+
+    function plotToData(clientX, clientY) {
+      const svg = $('#dataPlot');
+      const rect = svg.getBoundingClientRect();
+      const vx = (clientX - rect.left) / rect.width * 720;
+      const vy = (clientY - rect.top) / rect.height * 430;
+      const x = (vx - 58) / (720 - 58 - 24) * 10;
+      const y = (430 - 48 - vy) / (430 - 24 - 48) * 10;
+      return {x:Math.max(0,Math.min(10,x)), y:Math.max(0,Math.min(10,y))};
+    }
+
+    function addPoint(point) { 
+      replaceDataset([...state.points, {x:+point.x.toFixed(2), y:+point.y.toFixed(2)}]); 
+    }
+    
+    function deleteNearestPoint(point) {
+      if (!state.points.length) return;
+      let bestIndex=-1,bestDistance=Infinity;
+      state.points.forEach((candidate,i)=>{const distance=Math.hypot(candidate.x-point.x,candidate.y-point.y);if(distance<bestDistance){bestDistance=distance;bestIndex=i;}});
+      const svgRect=$('#dataPlot').getBoundingClientRect();
+      const threshold=18/(svgRect.width/10);
+      if(bestDistance<=threshold) replaceDataset(state.points.filter((_,i)=>i!==bestIndex));
+      else {state.message='No point was close enough to delete.';renderHeaderStatus();}
+    }
+
+    function generateRandomPoints() {
+      const count = 8 + Math.floor(Math.random()*9);
+      const pattern = Math.floor(Math.random()*3);
+      const points = Array.from({length:count},(_,i)=>{
+        const x=.5+i*9/(count-1)+(Math.random()-.5)*.35;
+        let y = pattern===0 ? 1.2+.78*x : pattern===1 ? 2.1+.09*(x-5)**2 : 5+2.7*Math.sin((x-1.5)/2.2);
+        y += (Math.random()-.5)*1.45;
+        return {x:Math.max(.2,Math.min(9.8,x)),y:Math.max(.3,Math.min(9.7,y))};
+      });
+      replaceDataset(points);
+    }
+
+    function bindEvents() {
+      $('#dataPlot').addEventListener('pointerdown', event => {
+        if(state.playing) return;
+        const point=plotToData(event.clientX,event.clientY);
+        if(state.mode==='add') addPoint(point); else deleteNearestPoint(point);
+      });
+      $('#addMode').addEventListener('click',()=>{state.mode='add';syncControls();});
+      $('#deleteMode').addEventListener('click',()=>{state.mode='delete';syncControls();});
+      $('#randomize').addEventListener('click',generateRandomPoints);
+      $('#clearData').addEventListener('click',()=>replaceDataset([]));
+      $('#stepButton').addEventListener('click',advanceTrainingStep);
+      $('#playButton').addEventListener('click',startAutoplay);
+      $('#pauseButton').addEventListener('click',()=>stopAutoplay());
+      $('#resetButton').addEventListener('click',()=>resetModel());
+      const configs = {
+        maxTrees:{key:'maxTrees',digits:0,suffix:''}, learningRate:{key:'learningRate',digits:2,suffix:''},
+        maxDepth:{key:'maxDepth',digits:0,suffix:''}, lambda:{key:'lambda',digits:1,suffix:''}, gamma:{key:'gamma',digits:1,suffix:''},
+        tolerance:{key:'convergenceTolerance',digits:5,suffix:''}
+      };
+      Object.entries(configs).forEach(([id,config])=>{
+        $(`#${id}`).addEventListener('input',event=>{
+          state.params[config.key]=Number(event.target.value);
+          $(`#${id}Out`).textContent=Number(event.target.value).toFixed(config.digits)+config.suffix;
+          resetModel('Hyperparameter changed. The ensemble restarted for a fair comparison.');
+        });
+      });
+      $('#speed').addEventListener('input',event=>{
+        state.params.animationSpeed=Number(event.target.value); $('#speedOut').textContent=`${event.target.value} ms`;
+        if(state.playing){window.clearInterval(state.timer);state.timer=window.setInterval(advanceTrainingStep,state.params.animationSpeed);}
+      });
+    }
+
+    try {
+      runAlgorithmSelfTests();
+    } catch (error) {
+      document.documentElement.dataset.selfTests = `failed: ${error.message}`;
+      console.error(error);
+    }
+    bindEvents();
+    resetModel('Model initialized at the mean target value.');
+  </script>
+</body>
+</html>
