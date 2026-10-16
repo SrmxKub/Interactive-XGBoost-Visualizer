@@ -168,6 +168,8 @@
     .spray-control label { color: var(--paper); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
     .spray-control output { color: var(--amber); font-size: 10px; font-variant-numeric: tabular-nums; text-align: right; }
     .spray-control small { grid-column: 1 / -1; color: #77756d; font-size: 8px; line-height: 1.45; }
+    .limit-notice { margin: 10px 0; padding: 10px 12px; border: 1px solid rgba(255,107,85,.6); background: rgba(255,107,85,.09); color: var(--red); font-size: 9px; line-height: 1.5; letter-spacing: .04em; }
+    .limit-notice strong { color: var(--red); }
     .residual-guide { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 1px; margin-top: 12px; border: 1px solid var(--line); background: var(--line); }
     .residual-guide > div { padding: 10px 12px; background: #0b0b09; color: var(--muted); font-size: 9px; }
     .residual-guide strong { display: block; color: var(--paper); font-size: 10px; margin-bottom: 2px; }
@@ -374,10 +376,11 @@
           <div><div class="section-kicker">Data laboratory</div><h2>Shape the problem</h2><p class="section-note">Each dot is one training example. Its horizontal position is the input x; height is the target y.</p></div>
           <span class="section-index">01</span>
         </div>
+        <div class="limit-notice" id="sprayLimitNotice" role="status" hidden><strong>240-point limit reached.</strong> Delete points or clear the canvas before adding more.</div>
         <div class="plot-shell">
-          <svg id="dataPlot" viewBox="0 0 720 430" role="img" aria-labelledby="dataPlotTitle dataPlotDesc" aria-keyshortcuts="ArrowUp ArrowDown ArrowLeft ArrowRight Enter Space" tabindex="0">
+          <svg id="dataPlot" viewBox="0 0 720 430" role="img" aria-labelledby="dataPlotTitle dataPlotDesc">
             <title id="dataPlotTitle">XGBoost regression data canvas</title>
-            <desc id="dataPlotDesc">Training points, residuals, learned prediction line, and newest split. With keyboard focus, use arrow keys to position the cursor and Enter or Space to add or delete.</desc>
+            <desc id="dataPlotDesc">Training points, residuals, learned prediction line, and newest split. Click or drag with a mouse or pointer to add and delete points.</desc>
           </svg>
         </div>
         <div class="residual-guide" id="residualGuide" aria-label="How to read residuals">
@@ -392,10 +395,10 @@
           <button class="button danger" id="clearData" type="button">Clear</button>
         </div>
         <div class="spray-control">
-          <label for="spraySize">Spray size</label>
+          <label for="spraySize">Brush size</label>
           <input id="spraySize" type="range" min="0.2" max="1.5" step="0.1" value="0.6">
           <output id="spraySizeOut" for="spraySize">0.6</output>
-          <small>Controls the radius and density of randomly scattered points. Click for one burst or drag to spray continuously.</small>
+          <small>Controls the add and delete brush radius. Click for precise edits or drag to paint and erase continuously.</small>
         </div>
         <div class="hint-bar" id="canvasHint">Click or drag across the plot to spray points.</div>
       </article>
@@ -810,7 +813,8 @@
       mode: 'add', playing: false, timer: null, status: 'Ready',
       message: 'Model initialized at the mean target value.', snapshot: null,
       phase: 'dataset', pendingRound: null, stopReason: '', spraySize:.6,
-      spraying:false, activePointer:null, lastSprayAt:0, sprayPosition:null
+      spraying:false, activePointer:null, lastSprayAt:0, sprayPosition:null,
+      gestureMoved:false, gestureStart:null
     };
 
     function resetModel(message = 'Model reset to the mean target value.') {
@@ -963,12 +967,13 @@
       svg.append(svgEl('text',{x:16,y:yTitleCenter,fill:PALETTE.muted,'font-size':10,'text-anchor':'middle',transform:`rotate(-90 16 ${yTitleCenter})`},'TARGET y'));
       if (!state.points.length) {
         svg.append(svgEl('text',{x:W/2,y:H/2,fill:PALETTE.muted,'font-size':14,'text-anchor':'middle'},'EMPTY CANVAS — CLICK TO ADD TRAINING POINTS'));
-        if (state.mode === 'add') {
+        if (state.mode === 'add' || state.mode === 'delete') {
           const cursor = state.sprayPosition || {x:-2,y:-2};
+          const cursorColor = state.mode === 'delete' ? PALETTE.red : PALETTE.amber;
           svg.append(svgEl('ellipse',{
             id:'sprayCursor', cx:sx(cursor.x), cy:sy(cursor.y),
             rx:state.spraySize/10*(W-p.l-p.r), ry:state.spraySize/10*(H-p.t-p.b),
-            fill:'rgba(255,176,0,.05)', stroke:PALETTE.amber, 'stroke-width':1.5,
+            fill:state.mode === 'delete' ? 'rgba(255,90,82,.07)' : 'rgba(255,176,0,.05)', stroke:cursorColor, 'stroke-width':1.5,
             'stroke-dasharray':'5 4', 'pointer-events':'none', opacity:state.sprayPosition ? .9 : 0
           }));
         }
@@ -1006,12 +1011,13 @@
         circle.append(svgEl('title',{},`Point ${i+1}: x ${fmt(point.x,2)}, target ${fmt(point.y,2)}, prediction ${fmt(state.predictions[i],2)}`));
         group.append(circle); svg.append(group);
       });
-      if (state.mode === 'add') {
+      if (state.mode === 'add' || state.mode === 'delete') {
         const cursor = state.sprayPosition || {x:-2,y:-2};
+        const cursorColor = state.mode === 'delete' ? PALETTE.red : PALETTE.amber;
         svg.append(svgEl('ellipse',{
           id:'sprayCursor', cx:sx(cursor.x), cy:sy(cursor.y),
           rx:state.spraySize/10*(W-p.l-p.r), ry:state.spraySize/10*(H-p.t-p.b),
-          fill:'rgba(255,176,0,.05)', stroke:PALETTE.amber, 'stroke-width':1.5,
+          fill:state.mode === 'delete' ? 'rgba(255,90,82,.07)' : 'rgba(255,176,0,.05)', stroke:cursorColor, 'stroke-width':1.5,
           'stroke-dasharray':'5 4', 'pointer-events':'none', opacity:state.sprayPosition ? .9 : 0
         }));
       }
@@ -1338,8 +1344,9 @@
       $('#addMode').classList.toggle('mode-active', state.mode === 'add');
       $('#deleteMode').classList.toggle('mode-active', state.mode === 'delete');
       $('#canvasHint').textContent = state.mode === 'add'
-        ? 'Click for one burst or drag to spray. Keyboard: arrows position the cursor; Enter or Space sprays.'
-        : 'Click near a point to remove it. Keyboard: arrows position the cursor; Enter or Space deletes.';
+        ? 'Click for one burst or drag with the mouse to spray.'
+        : 'Click near a point to remove one, or drag with the mouse to erase within the red brush.';
+      $('#sprayLimitNotice').hidden = state.points.length < 240;
     }
 
     function renderAll() {
@@ -1363,7 +1370,7 @@
         renderHeaderStatus();
         return;
       }
-      const burstSize = Math.min(available, Math.max(3, Math.round(3 + state.spraySize * 4)));
+      const burstSize = Math.min(available, Math.max(2, Math.round(1 + state.spraySize * 3)));
       const burst = createSprayBurst(center, state.spraySize, burstSize)
         .map(point => ({x:+point.x.toFixed(2), y:+point.y.toFixed(2)}));
       replaceDataset([...state.points, ...burst]);
@@ -1381,7 +1388,18 @@
       cursor.setAttribute('cy', H-p.b-(point.y / 10)*(H-p.t-p.b));
       cursor.setAttribute('rx', state.spraySize/10*(W-p.l-p.r));
       cursor.setAttribute('ry', state.spraySize/10*(H-p.t-p.b));
+      cursor.setAttribute('stroke', state.mode === 'delete' ? PALETTE.red : PALETTE.amber);
+      cursor.setAttribute('fill', state.mode === 'delete' ? 'rgba(255,90,82,.07)' : 'rgba(255,176,0,.05)');
       cursor.setAttribute('opacity','.9');
+    }
+
+    function erasePoints(center) {
+      const remaining = state.points.filter(point => Math.hypot(point.x-center.x, point.y-center.y) > state.spraySize);
+      const removed = state.points.length - remaining.length;
+      if (!removed) return;
+      replaceDataset(remaining);
+      state.message = `${removed} point${removed === 1 ? '' : 's'} erased. ${state.points.length} points remain.`;
+      renderHeaderStatus();
     }
     
     function deleteNearestPoint(point) {
@@ -1411,54 +1429,39 @@
       dataPlot.addEventListener('pointerdown', event => {
         if(state.playing) return;
         const point=plotToData(event.clientX,event.clientY);
-        if(state.mode==='add') {
-          event.preventDefault();
-          state.spraying=true;
-          state.activePointer=event.pointerId;
-          state.lastSprayAt=event.timeStamp;
-          dataPlot.setPointerCapture?.(event.pointerId);
-          updateSprayCursor(point);
-          sprayPoints(point);
-        } else deleteNearestPoint(point);
+        event.preventDefault();
+        state.spraying=true;
+        state.activePointer=event.pointerId;
+        state.lastSprayAt=event.timeStamp;
+        state.gestureMoved=false;
+        state.gestureStart={clientX:event.clientX,clientY:event.clientY,point};
+        dataPlot.setPointerCapture?.(event.pointerId);
+        updateSprayCursor(point);
+        if(state.mode==='add') sprayPoints(point);
       });
       dataPlot.addEventListener('pointermove', event => {
-        if(state.mode!=='add' || state.playing) return;
+        if(state.playing) return;
         const point=plotToData(event.clientX,event.clientY);
         updateSprayCursor(point);
-        if(state.spraying && state.activePointer===event.pointerId && event.timeStamp-state.lastSprayAt>=45) {
+        if(state.spraying && state.gestureStart && Math.hypot(event.clientX-state.gestureStart.clientX,event.clientY-state.gestureStart.clientY)>4) state.gestureMoved=true;
+        if(state.spraying && state.activePointer===event.pointerId && (state.mode==='delete' || event.timeStamp-state.lastSprayAt>=45)) {
           state.lastSprayAt=event.timeStamp;
-          sprayPoints(point);
+          if(state.mode==='add') sprayPoints(point); else erasePoints(point);
         }
       });
       const stopSpraying = event => {
         if(state.activePointer!==null && event.pointerId!==state.activePointer) return;
+        if(event.type==='pointerup' && state.mode==='delete' && !state.gestureMoved && state.gestureStart) deleteNearestPoint(state.gestureStart.point);
         state.spraying=false;
         state.activePointer=null;
+        state.gestureStart=null;
       };
       dataPlot.addEventListener('pointerup',stopSpraying);
       dataPlot.addEventListener('pointercancel',stopSpraying);
       dataPlot.addEventListener('lostpointercapture',stopSpraying);
       dataPlot.addEventListener('pointerleave',()=>{if(!state.spraying) updateSprayCursor(null,false);});
-      dataPlot.addEventListener('focus',()=>{
-        if(state.mode==='add' && !state.sprayPosition) updateSprayCursor({x:5,y:5});
-      });
-      dataPlot.addEventListener('keydown',event=>{
-        if(state.playing) return;
-        const movement = {ArrowLeft:[-.25,0],ArrowRight:[.25,0],ArrowUp:[0,.25],ArrowDown:[0,-.25]}[event.key];
-        if(movement) {
-          event.preventDefault();
-          const current=state.sprayPosition || {x:5,y:5};
-          updateSprayCursor({x:Math.max(0,Math.min(10,current.x+movement[0])),y:Math.max(0,Math.min(10,current.y+movement[1]))});
-          return;
-        }
-        if(event.key==='Enter' || event.key===' ') {
-          event.preventDefault();
-          const point=state.sprayPosition || {x:5,y:5};
-          if(state.mode==='add') sprayPoints(point); else deleteNearestPoint(point);
-        }
-      });
       $('#addMode').addEventListener('click',()=>{state.mode='add';renderDataPlot();syncControls();});
-      $('#deleteMode').addEventListener('click',()=>{state.mode='delete';state.sprayPosition=null;renderDataPlot();syncControls();});
+      $('#deleteMode').addEventListener('click',()=>{state.mode='delete';renderDataPlot();syncControls();});
       $('#randomize').addEventListener('click',generateRandomPoints);
       $('#clearData').addEventListener('click',()=>replaceDataset([]));
       $('#spraySize').addEventListener('input',event=>{

@@ -1,33 +1,34 @@
 # XGBoost Interactive Algorithm Visualizer
 
-A dependency-free, single-page teaching application that demonstrates how XGBoost regression builds decision trees from gradients, Hessians, regularized split gain, and leaf weights.
-
 ## Run locally
 
-You can open `index.html` directly in a modern browser. For the most reliable local behavior, serve the folder:
+No installation or build step is required. From the `XGBoost` directory, start a local web server:
 
 ```bash
 python3 -m http.server 8000
 ```
 
-Then visit `http://localhost:8000/`.
+Then open [http://localhost:8000/](http://localhost:8000/) in a modern web browser.
 
-## Deploy to GitHub Pages
-
-1. Push `index.html` and this README to the repository's default branch.
-2. Open **Settings → Pages** in the GitHub repository.
-3. Under **Build and deployment**, choose **Deploy from a branch**.
-4. Select the default branch, choose the root (`/`) folder, and save.
-5. Open the GitHub Pages URL shown after deployment completes.
-
-No package installation, compilation, or external runtime assets are required.
+To stop the server, return to the terminal and press `Ctrl+C`.
 
 ## How to use
 
-- Click the data canvas to add points, or switch to delete mode and click near a point.
-- Generate a random dataset or adjust the seven experiment controls, including convergence tolerance.
-- Select **Next Step** to move through the exact eight teaching stages: Input Dataset, Initial Prediction, Calculate Gradients & Hessians, Find the Best Split, Calculate Leaf Weights, Calculate Tree Contribution, Update Prediction & Loss, and Add Tree & Repeat.
-- Select **Train until Convergence** to advance through the same teaching steps automatically, or pause at any time.
-- Follow the residuals and prediction line on the left; inspect the mathematical flow, pending tree, completed additive ensemble, point ledger, boosting loop, and primary MSE loss curve on the right.
+1. Create a dataset in the **Shape the Problem** panel:
+   - Select **Add Points**, then click the canvas to add a small group of points or drag to spray points continuously.
+   - Adjust **Brush Size** to change the radius and number of points created by each spray.
+   - Select **Delete Points**, then click near a point to remove one point or drag to erase multiple points within the red brush.
+   - Select **Random Data** to generate a new dataset, or **Clear** to remove all points.
+   - The canvas supports up to 240 points. A red warning appears above the canvas when the limit is reached.
 
-The visualizer is a simplified educational XGBoost-style implementation for one-dimensional regression. It teaches the causal boosting flow rather than reproducing every feature of a production XGBoost library.
+2. Adjust the hyperparameters in the **Tune the Learner** panel. Changing a value resets the current model so training can restart with the new settings.
+
+3. Select **Next Step** to move through the XGBoost process one stage at a time. The right side explains the current calculation and updates the model structure.
+
+4. Select **Train Until Convergence** to run the steps automatically. Use **Pause** to stop the animation or **Reset Model** to restart training while keeping the current dataset.
+
+5. Observe the results:
+   - The data canvas shows the current prediction, residuals, and latest split.
+   - The model panels show gradients, Hessians, split gain, leaf weights, tree contributions, and the additive ensemble.
+   - The Training Ledger displays up to 12 representative points when the dataset is large, while the model still calculates every point.
+   - The Loss Graph shows how MSE, RMSE, and MAE change after each boosting round.
