@@ -398,7 +398,10 @@
           <label for="spraySize">Brush size</label>
           <input id="spraySize" type="range" min="0.2" max="1.5" step="0.1" value="0.6">
           <output id="spraySizeOut" for="spraySize">0.6</output>
-          <small>Controls the add and delete brush radius. Click for precise edits or drag to paint and erase continuously.</small>
+          <label for="sprayDensity">Spray density</label>
+          <input id="sprayDensity" type="range" min="1" max="10" step="1" value="3">
+          <output id="sprayDensityOut" for="sprayDensity">3</output>
+          <small>Brush Size controls the add and delete radius. Spray Density controls how many points are created per burst.</small>
         </div>
         <div class="hint-bar" id="canvasHint">Click or drag across the plot to spray points.</div>
       </article>
@@ -812,7 +815,7 @@
       params: {maxTrees:8, learningRate:.3, maxDepth:2, lambda:1, gamma:0, convergenceTolerance:.0001, animationSpeed:700},
       mode: 'add', playing: false, timer: null, status: 'Ready',
       message: 'Model initialized at the mean target value.', snapshot: null,
-      phase: 'dataset', pendingRound: null, stopReason: '', spraySize:.6,
+      phase: 'dataset', pendingRound: null, stopReason: '', spraySize:.6, sprayDensity:3,
       spraying:false, activePointer:null, lastSprayAt:0, sprayPosition:null,
       gestureMoved:false, gestureStart:null
     };
@@ -1341,6 +1344,7 @@
       $('#resetButton').disabled = state.playing;
       ['maxTrees','learningRate','maxDepth','lambda','gamma','tolerance'].forEach(id => $(`#${id}`).disabled = state.playing);
       $('#spraySize').disabled = state.playing;
+      $('#sprayDensity').disabled = state.playing;
       $('#addMode').classList.toggle('mode-active', state.mode === 'add');
       $('#deleteMode').classList.toggle('mode-active', state.mode === 'delete');
       $('#canvasHint').textContent = state.mode === 'add'
@@ -1370,7 +1374,7 @@
         renderHeaderStatus();
         return;
       }
-      const burstSize = Math.min(available, Math.max(2, Math.round(1 + state.spraySize * 3)));
+      const burstSize = Math.min(available, state.sprayDensity);
       const burst = createSprayBurst(center, state.spraySize, burstSize)
         .map(point => ({x:+point.x.toFixed(2), y:+point.y.toFixed(2)}));
       replaceDataset([...state.points, ...burst]);
@@ -1468,6 +1472,10 @@
         state.spraySize=Number(event.target.value);
         $('#spraySizeOut').textContent=state.spraySize.toFixed(1);
         if(state.sprayPosition) updateSprayCursor(state.sprayPosition);
+      });
+      $('#sprayDensity').addEventListener('input',event=>{
+        state.sprayDensity=Number(event.target.value);
+        $('#sprayDensityOut').textContent=String(state.sprayDensity);
       });
       $('#stepButton').addEventListener('click',advanceTrainingStep);
       $('#playButton').addEventListener('click',startAutoplay);

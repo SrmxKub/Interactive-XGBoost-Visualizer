@@ -16,7 +16,8 @@ To stop the server, return to the terminal and press `Ctrl+C`.
 
 1. Create a dataset in the **Shape the Problem** panel:
    - Select **Add Points**, then click the canvas to add a small group of points or drag to spray points continuously.
-   - Adjust **Brush Size** to change the radius and number of points created by each spray.
+   - Adjust **Brush Size** to change the spray and eraser radius.
+   - Adjust **Spray Density** to choose how many points are created per burst, from 1 to 10.
    - Select **Delete Points**, then click near a point to remove one point or drag to erase multiple points within the red brush.
    - Select **Random Data** to generate a new dataset, or **Clear** to remove all points.
    - The canvas supports up to 240 points. A red warning appears above the canvas when the limit is reached.
